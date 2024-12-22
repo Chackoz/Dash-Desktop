@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -56,12 +55,14 @@ interface Task {
   clientId?: string;
   code?: string;
   requirements?: string;
+ 
 }
 
-const TaskStatus: React.FC<{ status: Task["status"] }> = ({ status }) => {
+const TaskStatus: React.FC<{ status: Task["status"] ,output?:Task["output"]}> = ({ status,output }) => {
   const getStatusDetails = () => {
     switch (status) {
       case "completed":
+        
         return {
           icon: <CheckCircle className="w-4 h-4" />,
           color: "text-green-500",
@@ -74,6 +75,7 @@ const TaskStatus: React.FC<{ status: Task["status"] }> = ({ status }) => {
       case "failed":
         return { icon: <XCircle className="w-4 h-4" />, color: "text-red-500" };
       case "running":
+        
         return {
           icon: <Loader className="w-4 h-4 animate-spin" />,
           color: "text-blue-500",
@@ -165,6 +167,7 @@ export default function DashNetwork() {
   const [currentEditor, setCurrentEditor] = useState<"code" | "requirements">(
     "code"
   );
+  
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -264,6 +267,7 @@ export default function DashNetwork() {
 
       const result = await invoke<string>("run_python_code", {
         code: task.code,
+        requirements: task.requirements
       });
 
       await update(ref(database, `tasks/${taskId}`), {
@@ -286,11 +290,13 @@ export default function DashNetwork() {
       setOutput("Please enter some code first.");
       return;
     }
-
+    setOutput(
+      `Running code locally...\nRequirements:\n${requirements}`
+    );
     setIsLoading(true);
     try {
-      const result = await invoke<string>("run_python_code", { code });
-      setOutput(result);
+      const result = await invoke<string>("run_python_code", { code,requirements });
+      setOutput(`Running code locally...\nRequirements:\n${requirements}\nOutput:\n`+result);
     } catch (error) {
       setOutput(`Error: ${(error as Error).toString()}`);
     } finally {
@@ -421,7 +427,7 @@ export default function DashNetwork() {
                   className="w-full p-3 rounded bg-secondary/50 hover:bg-secondary text-left transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <TaskStatus status={task.status} />
+                    <TaskStatus status={task.status} output={task.output} />
                     <div className="text-xs font-mono truncate text-muted-foreground">
                       {`Task: ${task.id}`}
                     </div>

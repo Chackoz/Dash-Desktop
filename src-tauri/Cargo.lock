@@ -151,6 +151,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-log",
  "tempfile",
+ "uuid",
 ]
 
 [[package]]
