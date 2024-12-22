@@ -24,10 +24,13 @@ import {
   Timer,
   Sun,
   Moon,
-  NetworkIcon,
   FileText,
 } from "lucide-react";
-import { createTask, database } from "@/app/utils/firebaseConfig";
+import {
+  createTask,
+  database,
+  updateNodeStatus,
+} from "@/app/utils/firebaseConfig";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -57,42 +60,32 @@ interface Task {
   requirements?: string;
 }
 
-const TaskStatus: React.FC<{
+const TaskStatus = React.memo<{
   status: Task["status"];
   output?: Task["output"];
-}> = ({ status, output }) => {
-  const getStatusDetails = () => {
-    switch (status) {
-      case "completed":
-        return {
-          icon: <CheckCircle className="w-4 h-4" />,
-          color: "text-green-500",
-        };
-      case "assigned":
-        return {
-          icon: <Loader className="w-4 h-4 animate-spin" />,
-          color: "text-blue-500",
-        };
-      case "failed":
-        return { icon: <XCircle className="w-4 h-4" />, color: "text-red-500" };
-      case "running":
-        return {
-          icon: <Loader className="w-4 h-4 animate-spin" />,
-          color: "text-blue-500",
-        };
-      case "pending":
-        return {
-          icon: <Clock className="w-4 h-4 animate-spin" />,
-          color: "text-blue-500",
-        };
-      default:
-        return { icon: <Timer className="w-4 h-4" />, color: "text-gray-500" };
-    }
+}>(({ status }) => {
+  const statusConfig = {
+    completed: { icon: CheckCircle, color: "text-green-500", animate: false },
+    assigned: { icon: Loader, color: "text-blue-500", animate: true },
+    failed: { icon: XCircle, color: "text-red-500", animate: false },
+    running: { icon: Loader, color: "text-blue-500", animate: true },
+    pending: { icon: Clock, color: "text-blue-500", animate: true },
   };
 
-  const { icon, color } = getStatusDetails();
-  return <div className={`flex items-center ${color}`}>{icon}</div>;
-};
+  const config = statusConfig[status] || {
+    icon: Timer,
+    color: "text-gray-500",
+  };
+  const Icon = config.icon;
+
+  return (
+    <div className={`flex items-center ${config.color}`}>
+      <Icon className={`w-4 h-4 ${config.animate ? "animate-spin" : ""}`} />
+    </div>
+  );
+});
+
+TaskStatus.displayName = "TaskStatus";
 
 const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
   ({ task }) => (
@@ -154,9 +147,9 @@ export default function DashNetwork() {
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "upload">("editor");
-  const [nodeStatus, setNodeStatus] = useState<"idle" | "online" | "offline">(
-    "idle"
-  );
+  const [nodeStatus, setNodeStatus] = useState<
+    "idle" | "online" | "offline" | "busy"
+  >("idle");
   const [clientId, setClientId] = useState("");
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [networkNodes, setNetworkNodes] = useState(0);
@@ -257,6 +250,9 @@ export default function DashNetwork() {
 
   // Task execution helper
   const executeTask = async (taskId: string, task: Task) => {
+    
+    updateNodeStatus(clientId, "busy");
+    setNodeStatus("busy");
     try {
       await update(ref(database, `tasks/${taskId}`), {
         status: "running",
@@ -280,6 +276,9 @@ export default function DashNetwork() {
         completedAt: new Date().toISOString(),
       });
     }
+    
+    updateNodeStatus(clientId, "idle");
+    setNodeStatus("idle");
   };
 
   // Task handlers
@@ -290,6 +289,8 @@ export default function DashNetwork() {
     }
     setOutput(`Running code locally...\nRequirements:\n${requirements}`);
     setIsLoading(true);
+    setNodeStatus("busy");
+    updateNodeStatus(clientId , "busy");
     try {
       const result = await invoke<string>("run_python_code", {
         code,
@@ -304,6 +305,8 @@ export default function DashNetwork() {
     } finally {
       setIsLoading(false);
     }
+    setNodeStatus("idle");
+    updateNodeStatus(clientId , "idle");
   };
 
   const handleDistribute = async () => {
@@ -350,12 +353,10 @@ export default function DashNetwork() {
 
   const filteredTasks = useMemo(
     () =>
-      recentTasks
-      
-        .map((task) => ({
-          ...task,
-          id: task.id.replaceAll("-", ""),
-        })),
+      recentTasks.map((task) => ({
+        ...task,
+        id: task.id.replaceAll("-", ""),
+      })),
     [recentTasks]
   );
 
@@ -394,6 +395,8 @@ export default function DashNetwork() {
                       ? "bg-green-500"
                       : nodeStatus === "offline"
                       ? "bg-red-500"
+                      : nodeStatus === "idle"
+                      ? "bg-green-500"
                       : "bg-yellow-500"
                   }`}
                 />
@@ -500,7 +503,7 @@ export default function DashNetwork() {
                     value={requirements}
                     onChange={(e) => setRequirements(e.target.value)}
                     className="w-full h-[400px] font-mono text-sm p-4 rounded bg-secondary/50 resize-none focus:outline-none focus:ring-1"
-                    placeholder="# Enter your requirements (one per line)
+                    placeholder="# Enter your requirements comma seperated
 numpy==1.21.0
 pandas>=1.3.0
 requests"

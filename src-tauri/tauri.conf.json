@@ -13,10 +13,11 @@
     "windows": [
       {
         "title": "DASH",
-        "width": 800,
-        "height": 600,
+        "width": 1600,
+        "height": 900,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true
       }
     ],
     "security": {

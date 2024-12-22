@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 //import { getAnalytics } from "firebase/analytics";
-import { getDatabase, push, ref, set } from "firebase/database";
+import { getDatabase, push, ref, set, update } from "firebase/database";
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -53,3 +53,26 @@ export async function createTask(clientId: string, code: string, requirements?: 
     }
 }
 
+export type NodeStatus = "idle" | "online" | "offline" | "busy";
+
+export const updateNodeStatus = async (
+    clientId: string,
+    status: NodeStatus
+  ): Promise<void> => {
+    if (!clientId) {
+      throw new Error("Client ID is required");
+    }
+  
+    const presenceRef = ref(database, `presence/${clientId}`);
+    
+    try {
+      await update(presenceRef, {
+        status,
+        lastSeen: new Date().toISOString(),
+        type: "client"
+      });
+    } catch (error) {
+      console.error("Error updating node status:", error);
+      throw new Error(`Failed to update status: ${(error as Error).message}`);
+    }
+  };
