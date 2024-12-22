@@ -1,6 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { ref, onValue, set, push, onDisconnect } from "firebase/database";
+import {
+  ref,
+  onValue,
+  set,
+  push,
+  onDisconnect,
+  update,
+} from "firebase/database";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Code2,
@@ -12,24 +19,35 @@ import {
   CheckCircle,
   XCircle,
   Loader,
+  Timer,
 } from "lucide-react";
 import { createTask, database } from "@/app/utils/firebaseConfig";
 
 interface Task {
   id: string;
-  status: "pending" | "completed" | "failed" | "running";
+  status: "pending" | "completed" | "failed" | "running" | "assigned";
   createdAt: string;
   output?: string;
   workerId?: string;
+  assignedTo?: string;
+  assignedAt?: string;
+  clientId?: string;
+  code?: string;
 }
+
 type TaskStatusProps = {
-  status: "completed" | "failed" | "running" | "pending";
+  status: "completed" | "failed" | "running" | "pending" | "assigned";
 };
 
 const TaskStatus: React.FC<TaskStatusProps> = ({ status }) => {
   const getStatusDetails = () => {
     switch (status) {
       case "completed":
+        return {
+          icon: <CheckCircle className="w-4 h-4" />,
+          color: "text-green-500",
+        };
+      case "assigned":
         return {
           icon: <CheckCircle className="w-4 h-4" />,
           color: "text-green-500",
@@ -41,8 +59,14 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ status }) => {
           icon: <Loader className="w-4 h-4 animate-spin" />,
           color: "text-blue-500",
         };
+      case "pending":
+        return {
+          icon: <Clock className="w-4 h-4 animate-spin" />,
+          color: "text-blue-500",
+        };
       default:
-        return { icon: <Clock className="w-4 h-4" />, color: "text-gray-500" };
+        console.log("Status", status);
+        return { icon: <Timer className="w-4 h-4" />, color: "text-gray-500" };
     }
   };
 
@@ -66,7 +90,6 @@ export default function DashNetwork() {
     const setupNetwork = async () => {
       const presenceRef = ref(database, "presence");
       const connectRef = ref(database, ".info/connected");
-      const tasksRef = ref(database, "tasks");
 
       const newClientId =
         localStorage.getItem("clientId") || push(presenceRef).key;
@@ -94,43 +117,68 @@ export default function DashNetwork() {
         );
       });
 
-      function isTask(data:unknown): data is Task {
-        if(data === null || data === undefined) return false;
-        return (
-          typeof data === "object" && "createdAt" in data && "status" in data
-        );
-      }
+      const clientTasksRef = ref(database, "tasks");
 
-      onValue(tasksRef, (snapshot) => {
+      onValue(clientTasksRef, async (snapshot) => {
         const tasks = snapshot.val();
-        if (tasks && typeof tasks === "object") {
-          const tasksList: Task[] = Object.entries(tasks)
-            .map(([id, data]) => {
-              // Use the type guard to ensure 'data' is a valid Task
-              if (isTask(data)) {
-                return { ...data }; // Return as Task
-              }
-              // If data is invalid or incomplete, return a default object
-              return {
-                id,
-                status: "pending",
-                createdAt: new Date().toISOString(),
-              } as Task;
-            })
-            .sort(
-              (a, b) =>
-                new Date(b.createdAt).getTime() -
-                new Date(a.createdAt).getTime()
-            )
-            .slice(0, 5);
+        if (!tasks) return;
 
-          setRecentTasks(tasksList); // Now the types should be valid
+        // Check for tasks assigned to this client
+        for (const [taskId, task] of Object.entries(tasks)) {
+          const typedTask = task as Task;
+          if (
+            typedTask.assignedTo === clientId &&
+            typedTask.status === "assigned" &&
+            typedTask.code
+          ) {
+            // Execute the assigned task
+            try {
+              // Update status to running
+              await update(ref(database, `tasks/${taskId}`), {
+                status: "running",
+                startedAt: new Date().toISOString(),
+              });
+
+              // Execute the code
+              const result = await invoke<string>("run_python_code", {
+                code: typedTask.code,
+              });
+
+              // Update with success
+              await update(ref(database, `tasks/${taskId}`), {
+                status: "completed",
+                output: result,
+                completedAt: new Date().toISOString(),
+              });
+            } catch (error) {
+              // Update with failure
+              await update(ref(database, `tasks/${taskId}`), {
+                status: "failed",
+                output: `Error: ${(error as Error).toString()}`,
+                completedAt: new Date().toISOString(),
+              });
+            }
+          }
         }
+
+        // Update recent tasks list
+        const tasksList: Task[] = Object.entries(tasks)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          .map(([id, data]) => ({
+            ...(data as Task),
+          }))
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 5);
+        console.log("Task", tasksList);
+        setRecentTasks(tasksList);
       });
     };
 
     setupNetwork();
-  }, []);
+  }, [clientId]);
 
   const handleRunLocally = async () => {
     if (!code) {
@@ -145,7 +193,7 @@ export default function DashNetwork() {
       const result = await invoke<string>("run_python_code", { code });
       setOutput(result);
     } catch (error) {
-      setOutput(`Error: ${(error as Error).toString()}`); // Cast to Error to avoid "unknown" type
+      setOutput(`Error: ${(error as Error).toString()}`);
     } finally {
       setIsLoading(false);
     }
@@ -173,11 +221,12 @@ export default function DashNetwork() {
       const taskRef = ref(database, `tasks/${taskId}`);
       onValue(taskRef, (snapshot) => {
         const task = snapshot.val();
+
         if (task && task.status !== "pending") {
           setOutput(
             `Task ${taskId}\n` +
               `Status: ${task.status}\n` +
-              `Worker: ${task.workerId || "Unknown"}\n` +
+              `Worker: ${task.assignedTo || "Unknown"}\n` +
               `${task.output || ""}`
           );
         }
