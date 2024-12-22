@@ -45,8 +45,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
-import { dracula } from "@uiw/codemirror-theme-dracula";
-
+import { githubDark } from '@uiw/codemirror-theme-github';
 interface Task {
   id: string;
   status: "pending" | "completed" | "failed" | "running" | "assigned";
@@ -119,10 +118,10 @@ const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
             <h3 className="text-sm font-medium">Code</h3>
             <CodeMirror
               value={task.code}
-              theme={dracula}
+              theme={githubDark}
               extensions={[python()]}
               editable={false}
-              className="text-xs"
+              className="text-xs rounded-2xl"
             />
           </div>
         )}
@@ -221,8 +220,8 @@ export default function DashNetwork() {
 
       // Update recent tasks
       const tasksList = Object.entries(tasks)
-        .map(([id, data]) => ({
-          id,
+        .map(([, data]) => ({
+       
           ...(data as Task),
         }))
         .filter((task) => showAllTasks || task.clientId === newClientId)
@@ -355,7 +354,7 @@ export default function DashNetwork() {
     () =>
       recentTasks.map((task) => ({
         ...task,
-        id: task.id.replaceAll("-", ""),
+        id: task.id,
       })),
     [recentTasks]
   );
@@ -491,10 +490,10 @@ export default function DashNetwork() {
                 <TabsContent value="code" className="flex-1 mt-4">
                   <CodeMirror
                     value={code}
-                    theme={dracula}
+                    theme={githubDark}
                     extensions={[python()]}
                     onChange={setCode}
-                    className="flex-1"
+                    className="flex-1 rounded-md overflow-hidden"
                     height="400px"
                   />
                 </TabsContent>
