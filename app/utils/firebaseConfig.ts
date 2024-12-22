@@ -29,14 +29,16 @@ export interface Task {
     updatedAt?: string;
     workerId?: string;
     error?: string;
+    requirements?: string;
 }
 
-export async function createTask(clientId: string, code: string): Promise<string | null> {
+export async function createTask(clientId: string, code: string, requirements?: string): Promise<string | null> {
     const tasksRef = ref(database, 'tasks');
     const newTaskRef = push(tasksRef);
     const task: Task = {
         clientId,
         code,
+        requirements,
         status: 'pending',
         output: null,
         createdAt: new Date().toISOString(),
@@ -50,3 +52,4 @@ export async function createTask(clientId: string, code: string): Promise<string
         return null;
     }
 }
+

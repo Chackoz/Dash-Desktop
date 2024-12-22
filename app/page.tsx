@@ -1,19 +1,49 @@
-"use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ref, onValue, set, push, onDisconnect, update, off, DataSnapshot } from "firebase/database";
+import {
+  ref,
+  onValue,
+  set,
+  push,
+  onDisconnect,
+  update,
+  off,
+  DataSnapshot,
+} from "firebase/database";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  Code2, Network, PlayCircle, Terminal, Upload, Clock,
-  CheckCircle, XCircle, Loader, Timer, Sun, Moon,
-  NetworkIcon
+  Code2,
+  Network,
+  PlayCircle,
+  Terminal,
+  Upload,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader,
+  Timer,
+  Sun,
+  Moon,
+  NetworkIcon,
+  FileText,
 } from "lucide-react";
 import { createTask, database } from "@/app/utils/firebaseConfig";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import CodeMirror from "@uiw/react-codemirror";
+import { python } from "@codemirror/lang-python";
+import { dracula } from "@uiw/codemirror-theme-dracula";
 
 interface Task {
   id: string;
@@ -25,21 +55,34 @@ interface Task {
   assignedAt?: string;
   clientId?: string;
   code?: string;
+  requirements?: string;
 }
 
-const TaskStatus: React.FC<{ status: Task['status'] }> = ({ status }) => {
+const TaskStatus: React.FC<{ status: Task["status"] }> = ({ status }) => {
   const getStatusDetails = () => {
     switch (status) {
       case "completed":
-        return { icon: <CheckCircle className="w-4 h-4" />, color: "text-green-500" };
+        return {
+          icon: <CheckCircle className="w-4 h-4" />,
+          color: "text-green-500",
+        };
       case "assigned":
-        return { icon: <NetworkIcon className="w-4 h-4" />, color: "text-green-500" };
+        return {
+          icon: <NetworkIcon className="w-4 h-4" />,
+          color: "text-green-500",
+        };
       case "failed":
         return { icon: <XCircle className="w-4 h-4" />, color: "text-red-500" };
       case "running":
-        return { icon: <Loader className="w-4 h-4 animate-spin" />, color: "text-blue-500" };
+        return {
+          icon: <Loader className="w-4 h-4 animate-spin" />,
+          color: "text-blue-500",
+        };
       case "pending":
-        return { icon: <Clock className="w-4 h-4 animate-spin" />, color: "text-blue-500" };
+        return {
+          icon: <Clock className="w-4 h-4 animate-spin" />,
+          color: "text-blue-500",
+        };
       default:
         return { icon: <Timer className="w-4 h-4" />, color: "text-gray-500" };
     }
@@ -49,58 +92,83 @@ const TaskStatus: React.FC<{ status: Task['status'] }> = ({ status }) => {
   return <div className={`flex items-center ${color}`}>{icon}</div>;
 };
 
-const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task}) => (
-  <DialogContent className="sm:max-w-2xl">
-    <DialogHeader>
-      <DialogTitle>Task Details</DialogTitle>
-    </DialogHeader>
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TaskStatus status={task.status} />
-        <span className="text-sm">{new Date(task.createdAt).toLocaleString()}</span>
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium">Task ID</h3>
-        <code className="block p-2 rounded bg-secondary text-xs">{task.id}</code>
-      </div>
-      {task.code && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium">Code</h3>
-          <pre className="p-2 rounded bg-secondary overflow-x-auto">
-            <code className="text-xs">{task.code}</code>
-          </pre>
+const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
+  ({ task }) => (
+    <DialogContent className="min-w-[70%] h-fit max-h-[90%]  rounded-3xl overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Task Details</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <TaskStatus status={task.status} />
+          <span className="text-sm">
+            {new Date(task.createdAt).toLocaleString()}
+          </span>
         </div>
-      )}
-      {task.output && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Output</h3>
-          <pre className="p-2 rounded bg-secondary overflow-x-auto">
-            <code className="text-xs">{task.output}</code>
-          </pre>
+          <h3 className="text-sm font-medium">Task ID</h3>
+          <code className="block p-2 rounded bg-secondary text-xs">
+            {task.id}
+          </code>
         </div>
-      )}
-    </div>
-  </DialogContent>
-));
+        {task.output && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Output</h3>
+            <pre className="p-2 rounded bg-secondary overflow-x-auto">
+              <code className="text-xs">{task.output}</code>
+            </pre>
+          </div>
+        )}
+        {task.code && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Code</h3>
+            <CodeMirror
+              value={task.code}
+              theme={dracula}
+              extensions={[python()]}
+              editable={false}
+              className="text-xs"
+            />
+          </div>
+        )}
+        {task.requirements && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Requirements</h3>
+            <pre className="p-2 rounded bg-secondary overflow-x-auto">
+              <code className="text-xs">{task.requirements}</code>
+            </pre>
+          </div>
+        )}
+        
+      </div>
+    </DialogContent>
+  )
+);
 
 TaskDetails.displayName = "TaskDetails";
 
 export default function DashNetwork() {
   const [code, setCode] = useState("");
+  const [requirements, setRequirements] = useState("");
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "upload">("editor");
-  const [nodeStatus, setNodeStatus] = useState<"idle" | "online" | "offline">("idle");
+  const [nodeStatus, setNodeStatus] = useState<"idle" | "online" | "offline">(
+    "idle"
+  );
   const [clientId, setClientId] = useState("");
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [networkNodes, setNetworkNodes] = useState(0);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentEditor, setCurrentEditor] = useState<"code" | "requirements">(
+    "code"
+  );
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
-
 
   // Network setup effect
   useEffect(() => {
@@ -109,7 +177,8 @@ export default function DashNetwork() {
     const clientTasksRef = ref(database, "tasks");
 
     // Generate or retrieve client ID
-    const newClientId = localStorage.getItem("clientId") || push(presenceRef).key || "";
+    const newClientId =
+      localStorage.getItem("clientId") || push(presenceRef).key || "";
     localStorage.setItem("clientId", newClientId);
     setClientId(newClientId);
 
@@ -162,8 +231,11 @@ export default function DashNetwork() {
           id,
           ...(data as Task),
         }))
-        .filter(task => showAllTasks || task.clientId === newClientId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .filter((task) => showAllTasks || task.clientId === newClientId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
         .slice(0, 10);
 
       setRecentTasks(tasksList);
@@ -228,21 +300,27 @@ export default function DashNetwork() {
 
   const handleDistribute = async () => {
     if (!code || nodeStatus === "offline" || !clientId) {
-      setOutput("Error: Cannot distribute task. Please check your connection and code.");
+      setOutput(
+        "Error: Cannot distribute task. Please check your connection and code."
+      );
       return;
     }
 
     setIsLoading(true);
     try {
-      const taskId = await createTask(clientId, code);
-      setOutput(`Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`);
+      const taskId = await createTask(clientId, code, requirements);
+      setOutput(
+        `Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`
+      );
 
       const taskRef = ref(database, `tasks/${taskId}`);
       onValue(taskRef, (snapshot) => {
         const task = snapshot.val();
         if (task && task.status !== "pending") {
           setOutput(
-            `Task ${taskId}\nStatus: ${task.status}\nWorker: ${task.assignedTo || "Unknown"}\n${task.output || ""}`
+            `Task ${taskId}\nStatus: ${task.status}\nWorker: ${
+              task.assignedTo || "Unknown"
+            }\n${task.output || ""}`
           );
         }
       });
@@ -252,16 +330,24 @@ export default function DashNetwork() {
       setIsLoading(false);
     }
   };
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        file.text().then(setCode);
+      }
+    },
+    []
+  );
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      file.text().then(setCode);
-    }
-  }, []);
-
-  const filteredTasks = useMemo(() => 
-    recentTasks.filter(task => task.status !== "assigned"),
+  const filteredTasks = useMemo(
+    () =>
+      recentTasks
+        .filter((task) => task.status !== "assigned")
+        .map((task) => ({
+          ...task,
+          id: task.id.replaceAll("-", ""),
+        })),
     [recentTasks]
   );
 
@@ -272,15 +358,18 @@ export default function DashNetwork() {
           <CardHeader className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Network className="w-5 h-5" />
-                <CardTitle className="text-lg">DASH Network</CardTitle>
+                <CardTitle className="text-lg">DASH</CardTitle>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsDarkMode(!isDarkMode)}
               >
-                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {isDarkMode ? (
+                  <Sun className="w-4 h-4" />
+                ) : (
+                  <Moon className="w-4 h-4" />
+                )}
               </Button>
             </div>
           </CardHeader>
@@ -291,19 +380,28 @@ export default function DashNetwork() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  nodeStatus === "online" ? "bg-green-500" :
-                  nodeStatus === "offline" ? "bg-red-500" : "bg-yellow-500"
-                }`} />
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    nodeStatus === "online"
+                      ? "bg-green-500"
+                      : nodeStatus === "offline"
+                      ? "bg-red-500"
+                      : "bg-yellow-500"
+                  }`}
+                />
                 <span className="text-sm capitalize">{nodeStatus}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Active Nodes</span>
+              <span className="text-sm text-muted-foreground">
+                Active Nodes
+              </span>
               <span className="text-sm">{networkNodes}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Show All Tasks</span>
+              <span className="text-sm text-muted-foreground">
+                Show All Tasks
+              </span>
               <Switch
                 checked={showAllTasks}
                 onCheckedChange={setShowAllTasks}
@@ -325,14 +423,12 @@ export default function DashNetwork() {
                   <div className="flex items-center justify-between mb-2">
                     <TaskStatus status={task.status} />
                     <div className="text-xs font-mono truncate text-muted-foreground">
-                    {`Task: ${task.id?.replaceAll("-", "")}`}
-                  </div>
-                    
+                      {`Task: ${task.id}`}
+                    </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                      {new Date(task.createdAt).toLocaleTimeString()}
-                    </span>
-                 
+                    {new Date(task.createdAt).toLocaleTimeString()}
+                  </span>
                 </button>
               ))}
             </div>
@@ -365,66 +461,135 @@ export default function DashNetwork() {
         <div className="flex-1 p-6">
           <div className="h-full flex flex-col">
             {activeTab === "editor" ? (
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="flex-1 w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none focus:outline-none focus:ring-1"
-                placeholder="# Enter your Python code here..."
-              />
-            ) : (
-              <label className="flex-1 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-secondary/50 transition-colors">
-                <div className="text-center">
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Upload Python File (.py)
-                  </span>
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".py"
-                    onChange={handleFileUpload}
+              <Tabs
+                value={currentEditor}
+                onValueChange={(v) =>
+                  setCurrentEditor(v as "code" | "requirements")
+                }
+              >
+                <TabsList>
+                  <TabsTrigger value="code" className="space-x-2">
+                    <Code2 className="w-4 h-4" />
+                    <span>Code</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="requirements" className="space-x-2">
+                    <FileText className="w-4 h-4" />
+                    <span>Requirements</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="code" className="flex-1 mt-4">
+                  <CodeMirror
+                    value={code}
+                    theme={dracula}
+                    extensions={[python()]}
+                    onChange={setCode}
+                    className="flex-1"
+                    height="400px"
                   />
-                </div>
-              </label>
-            )}<div className="flex space-x-4 mt-4">
-            <Button
-              onClick={handleRunLocally}
-              disabled={isLoading || !code}
-              variant="secondary"
-              className="space-x-2"
-            >
-              <PlayCircle className="w-4 h-4" />
-              <span>Run Locally</span>
-            </Button>
+                </TabsContent>
+                <TabsContent value="requirements" className="flex-1 mt-4">
+                  <textarea
+                    value={requirements}
+                    onChange={(e) => setRequirements(e.target.value)}
+                    className="w-full h-[400px] font-mono text-sm p-4 rounded bg-secondary/50 resize-none focus:outline-none focus:ring-1"
+                    placeholder="# Enter your requirements (one per line)
+numpy==1.21.0
+pandas>=1.3.0
+requests"
+                  />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <div className="flex-1 grid grid-cols-2 gap-4">
+                <label className="flex-1 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-secondary/50 transition-colors">
+                  <div className="text-center">
+                    <Code2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Upload Python File (.py)
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".py"
+                      onChange={handleFileUpload}
+                    />
+                  </div>
+                </label>
+                <label className="flex-1 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-secondary/50 transition-colors">
+                  <div className="text-center">
+                    <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Upload Requirements (.txt)
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".txt"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          file.text().then(setRequirements);
+                        }
+                      }}
+                    />
+                  </div>
+                </label>
+              </div>
+            )}
 
-            <Button
-              onClick={handleDistribute}
-              disabled={isLoading || !code || nodeStatus === "offline"}
-              className="space-x-2"
-            >
-              <Network className="w-4 h-4" />
-              <span>Distribute to Network</span>
-            </Button>
-          </div>
+            <div className="flex space-x-4 mt-4">
+              <Button
+                onClick={handleRunLocally}
+                disabled={isLoading || !code}
+                variant="secondary"
+                className="space-x-2"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>Run Locally</span>
+              </Button>
 
-          <div className="mt-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <Terminal className="w-4 h-4" />
-              <span className="font-medium">Output</span>
+              <Button
+                onClick={handleDistribute}
+                disabled={isLoading || !code || nodeStatus === "offline"}
+                className="space-x-2"
+              >
+                <Network className="w-4 h-4" />
+                <span>Distribute to Network</span>
+              </Button>
             </div>
-            <textarea
-              value={output}
-              readOnly
-              className="w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none h-48 focus:outline-none focus:ring-1"
-            />
+
+            {requirements && (
+              <Alert className="mt-4">
+                <AlertDescription className="text-sm">
+                  Requirements will be installed in an isolated environment
+                  before running the code.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="mt-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Terminal className="w-4 h-4" />
+                <span className="font-medium">Output</span>
+              </div>
+              <textarea
+                value={output}
+                readOnly
+                className="w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none h-48 focus:outline-none focus:ring-1"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
-      {selectedTask && <TaskDetails task={selectedTask} onClose={() => setSelectedTask(null)} />}
-    </Dialog>
-  </div>
-);
+      <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
+        {selectedTask && (
+          <TaskDetails
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+          />
+        )}
+      </Dialog>
+    </div>
+  );
 }
