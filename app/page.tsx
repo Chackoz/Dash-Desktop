@@ -55,27 +55,27 @@ interface Task {
   clientId?: string;
   code?: string;
   requirements?: string;
- 
 }
 
-const TaskStatus: React.FC<{ status: Task["status"] ,output?:Task["output"]}> = ({ status,output }) => {
+const TaskStatus: React.FC<{
+  status: Task["status"];
+  output?: Task["output"];
+}> = ({ status, output }) => {
   const getStatusDetails = () => {
     switch (status) {
       case "completed":
-        
         return {
           icon: <CheckCircle className="w-4 h-4" />,
           color: "text-green-500",
         };
       case "assigned":
         return {
-          icon: <NetworkIcon className="w-4 h-4" />,
-          color: "text-green-500",
+          icon: <Loader className="w-4 h-4 animate-spin" />,
+          color: "text-blue-500",
         };
       case "failed":
         return { icon: <XCircle className="w-4 h-4" />, color: "text-red-500" };
       case "running":
-        
         return {
           icon: <Loader className="w-4 h-4 animate-spin" />,
           color: "text-blue-500",
@@ -141,7 +141,6 @@ const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
             </pre>
           </div>
         )}
-        
       </div>
     </DialogContent>
   )
@@ -167,7 +166,6 @@ export default function DashNetwork() {
   const [currentEditor, setCurrentEditor] = useState<"code" | "requirements">(
     "code"
   );
-  
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -267,7 +265,7 @@ export default function DashNetwork() {
 
       const result = await invoke<string>("run_python_code", {
         code: task.code,
-        requirements: task.requirements
+        requirements: task.requirements,
       });
 
       await update(ref(database, `tasks/${taskId}`), {
@@ -290,13 +288,17 @@ export default function DashNetwork() {
       setOutput("Please enter some code first.");
       return;
     }
-    setOutput(
-      `Running code locally...\nRequirements:\n${requirements}`
-    );
+    setOutput(`Running code locally...\nRequirements:\n${requirements}`);
     setIsLoading(true);
     try {
-      const result = await invoke<string>("run_python_code", { code,requirements });
-      setOutput(`Running code locally...\nRequirements:\n${requirements}\nOutput:\n`+result);
+      const result = await invoke<string>("run_python_code", {
+        code,
+        requirements,
+      });
+      setOutput(
+        `Running code locally...\nRequirements:\n${requirements}\nOutput:\n` +
+          result
+      );
     } catch (error) {
       setOutput(`Error: ${(error as Error).toString()}`);
     } finally {
@@ -349,7 +351,7 @@ export default function DashNetwork() {
   const filteredTasks = useMemo(
     () =>
       recentTasks
-        .filter((task) => task.status !== "assigned")
+      
         .map((task) => ({
           ...task,
           id: task.id.replaceAll("-", ""),
