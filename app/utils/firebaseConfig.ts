@@ -60,6 +60,9 @@ export const updateNodeStatus = async (
     status: NodeStatus
   ): Promise<void> => {
    
+    if(clientId === null || clientId === undefined||clientId === "") {
+      throw new Error(`Client ID is required`);
+    }
   
     const presenceRef = ref(database, `presence/${clientId}`);
     

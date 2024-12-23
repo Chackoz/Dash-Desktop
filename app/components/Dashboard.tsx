@@ -74,8 +74,8 @@ interface PresenceData {
   status: "idle" | "online" | "offline" | "busy";
   lastSeen: string;
   type: "client" | "worker";
-  userId?: string;
   email?: string;
+  userId?: string;
 }
 
 
@@ -327,8 +327,10 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
   // Task execution helper
   const executeTask = async (taskId: string, task: Task) => {
-    
+    setClientId(localStorage.getItem("clientId")||"");
+    if(!(clientId === null || clientId === undefined||clientId === "")) {
     updateNodeStatus(clientId, "busy");
+    }
     setNodeStatus("busy");
     try {
       await update(ref(database, `tasks/${taskId}`), {
@@ -353,8 +355,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         completedAt: new Date().toISOString(),
       });
     }
-    
+    if(!(clientId === null || clientId === undefined||clientId === "")) {
     updateNodeStatus(clientId, "idle");
+    }
     setNodeStatus("idle");
   };
 
