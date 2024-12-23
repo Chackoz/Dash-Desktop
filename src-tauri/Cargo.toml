@@ -8,7 +8,11 @@ repository = ""
 edition = "2021"
 rust-version = "1.77.2"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[tauri]
+windows = [
+  # This option ensures no terminal appears when running the .exe
+  { window = { hide_console = true } }
+]
 
 [lib]
 name = "app_lib"
@@ -21,7 +25,7 @@ tauri-build = { version = "2.0.2", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.1.0", features = [] }
+tauri = { version = "2.1.1", features = [] }  
 tauri-plugin-log = "2.0.0-rc"
 tempfile = "3.14.0"
 env_logger = "0.11.6"
