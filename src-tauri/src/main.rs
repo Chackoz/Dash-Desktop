@@ -1,12 +1,49 @@
-use tauri::Manager;
 use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
 use env_logger;
 use std::process::Command;
-use std::path::PathBuf;
 use uuid::Uuid;
+use serde::Serialize;
+use sys_info::{cpu_num, cpu_speed, mem_info};
 
+#[derive(Serialize)]
+struct SystemSpecs {
+    os: String,
+    cpu: String,
+    ram: String,
+    gpu: Option<String>,
+    gpu_vram: Option<String>,
+}
+
+#[tauri::command]
+fn get_system_specs() -> SystemSpecs {
+    let os = std::env::consts::OS.to_string();
+    
+    let cpu = format!(
+        "{} cores @ {} MHz",
+        cpu_num().unwrap_or(0),
+        cpu_speed().unwrap_or(0)
+    );
+    
+    // Handle memory info without using default
+    let ram = if let Ok(mem) = mem_info() {
+        format!(
+            "{:.1} GB",
+            mem.total as f64 / (1024.0 * 1024.0)
+        )
+    } else {
+        "Unknown".to_string()
+    };
+    
+    SystemSpecs {
+        os,
+        cpu,
+        ram,
+        gpu: None,
+        gpu_vram: None,
+    }
+}
 
 fn is_dangerous_command(code: &str) -> bool {
     let dangerous_patterns = [
@@ -58,10 +95,7 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
 
     // Install requirements if provided
     if let Some(reqs_str) = requirements {
-       
-
         if !reqs_str.is_empty() {
-            // Split the comma-separated string and collect into a Vec
             let reqs: Vec<&str> = reqs_str.split(',')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
@@ -77,7 +111,6 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
                     .map_err(|e| format!("Failed to install requirements: {}", e))?;
 
                 if !install_output.status.success() {
-                    // Clean up virtual environment before returning
                     let _ = fs::remove_dir_all(&venv_path);
                     return Err(format!("Failed to install requirements: {}", 
                         String::from_utf8_lossy(&install_output.stderr)));
@@ -85,23 +118,23 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
             }
         }
     }
+
     // Create a temporary file for the code
     let mut temp_file = NamedTempFile::new()
         .map_err(|e| format!("Failed to create temp file: {}", e))?;
     
-    // Write the code
     temp_file.write_all(code.as_bytes())
         .map_err(|e| format!("Failed to write code: {}", e))?;
 
     let temp_path = temp_file.into_temp_path();
 
-    // Run the Python code in the virtual environment
-    let output = Command::new(venv_python)
+    // Run the Python code
+    let output = Command::new(&venv_python)
         .arg(temp_path.to_str().unwrap())
         .output()
         .map_err(|e| format!("Failed to execute Python: {}", e))?;
 
-    // Clean up the virtual environment
+    // Clean up
     let _ = fs::remove_dir_all(&venv_path);
 
     // Handle output
@@ -115,12 +148,14 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
     }
 }
 
-
 fn main() {
     env_logger::init();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_python_code])
+        .invoke_handler(tauri::generate_handler![
+            run_python_code,
+            get_system_specs
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

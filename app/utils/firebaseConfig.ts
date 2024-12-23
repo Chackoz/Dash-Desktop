@@ -59,9 +59,7 @@ export const updateNodeStatus = async (
     clientId: string,
     status: NodeStatus
   ): Promise<void> => {
-    if (!clientId) {
-      throw new Error("Client ID is required");
-    }
+   
   
     const presenceRef = ref(database, `presence/${clientId}`);
     
