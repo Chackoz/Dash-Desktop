@@ -70,6 +70,14 @@ interface Task {
   code?: string;
   requirements?: string;
 }
+interface PresenceData {
+  status: "idle" | "online" | "offline" | "busy";
+  lastSeen: string;
+  type: "client" | "worker";
+  userId?: string;
+  email?: string;
+}
+
 
 const TaskStatus = React.memo<{
   status: Task["status"];
@@ -255,7 +263,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
       // Only count valid presence entries
       const activeNodes = Object.entries(presenceData).filter(([id, data]) => {
-        const presence = data as any;
+        const presence = data as PresenceData;
         // Verify the presence entry has required fields and is recent (within last minute)
         return (
           id && // Has valid ID
