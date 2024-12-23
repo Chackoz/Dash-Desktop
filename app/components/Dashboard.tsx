@@ -181,76 +181,125 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
   const { isDarkMode, toggleTheme } = useTheme();
 
-  // Network setup effect
   useEffect(() => {
     const presenceRef = ref(database, "presence");
     const connectRef = ref(database, ".info/connected");
     const clientTasksRef = ref(database, "tasks");
 
     // Generate or retrieve client ID
-    const newClientId =
-      localStorage.getItem("clientId") || push(presenceRef).key || "";
-    localStorage.setItem("clientId", newClientId);
+    const storedClientId = localStorage.getItem("clientId");
+    let newClientId: string;
+    
+    if (!storedClientId) {
+      // Generate new client ID only if one doesn't exist
+      const newRef = push(presenceRef);
+      newClientId = newRef.key || "";
+      localStorage.setItem("clientId", newClientId);
+    } else {
+      newClientId = storedClientId;
+    }
+    
     setClientId(newClientId);
 
-    // Set up presence
+    // Set up presence with proper path
     const setupPresence = () => {
-      set(ref(database, `presence/${newClientId}`), {
+      if (!newClientId) return; // Guard against empty client ID
+      
+      const clientPresenceRef = ref(database, `presence/${newClientId}`);
+      const presenceData = {
         status: "idle",
         lastSeen: new Date().toISOString(),
         type: "client",
-      });
+        userId: user.uid,
+        email: user.email,
+      };
+
+      // Set initial presence
+      set(clientPresenceRef, presenceData);
+
+      // Set up disconnect cleanup
+      onDisconnect(clientPresenceRef).remove();
+
+      // Set up periodic presence updates
+      const presenceInterval = setInterval(() => {
+        update(clientPresenceRef, {
+          lastSeen: new Date().toISOString(),
+        });
+      }, 30000); // Update every 30 seconds
+
+      return () => clearInterval(presenceInterval);
     };
 
-    setupPresence();
+    let presenceCleanup: (() => void) | undefined;
 
     // Connection handler
     const handleConnection = (snapshot: DataSnapshot) => {
       if (snapshot.val()) {
-        onDisconnect(ref(database, `presence/${newClientId}`)).remove();
+        presenceCleanup = setupPresence();
         setNodeStatus("online");
       } else {
+        if (presenceCleanup) {
+          presenceCleanup();
+        }
         setNodeStatus("offline");
       }
     };
 
-    // Presence handler
+    // Presence handler with proper filtering
     const handlePresence = (snapshot: DataSnapshot) => {
-      setNetworkNodes(snapshot.val() ? Object.keys(snapshot.val()).length : 0);
+      const presenceData = snapshot.val();
+      if (!presenceData) {
+        setNetworkNodes(0);
+        return;
+      }
+
+      // Only count valid presence entries
+      const activeNodes = Object.entries(presenceData).filter(([id, data]) => {
+        const presence = data as any;
+        // Verify the presence entry has required fields and is recent (within last minute)
+        return (
+          id && // Has valid ID
+          presence.lastSeen && // Has lastSeen timestamp
+          presence.status && // Has status
+          presence.type === "client" && // Is a client
+          new Date().getTime() - new Date(presence.lastSeen).getTime() < 60000 // Was active in last minute
+        );
+      }).length;
+
+      setNetworkNodes(activeNodes);
     };
-
-    // Tasks handler
-    const handleTasks = async (snapshot: DataSnapshot) => {
-      const tasks = snapshot.val();
-      if (!tasks) return;
-
-      // Process assigned tasks
-      Object.entries(tasks).forEach(async ([taskId, task]) => {
-        const typedTask = task as Task;
-        if (
-          typedTask.assignedTo === newClientId &&
-          typedTask.status === "assigned" &&
-          typedTask.code
-        ) {
-          await executeTask(taskId, typedTask);
-        }
-      });
-
-      // Update recent tasks
-      const tasksList = Object.entries(tasks)
-        .map(([, data]) => ({
-       
-          ...(data as Task),
-        }))
-        .filter((task) => showAllTasks || task.clientId === newClientId)
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 10);
-
-      setRecentTasks(tasksList);
-    };
+      // Tasks handler
+      const handleTasks = async (snapshot: DataSnapshot) => {
+        const tasks = snapshot.val();
+        if (!tasks) return;
+  
+        // Process assigned tasks
+        Object.entries(tasks).forEach(async ([taskId, task]) => {
+          const typedTask = task as Task;
+          if (
+            typedTask.assignedTo === newClientId &&
+            typedTask.status === "assigned" &&
+            typedTask.code
+          ) {
+            await executeTask(taskId, typedTask);
+          }
+        });
+  
+        // Update recent tasks
+        const tasksList = Object.entries(tasks)
+          .map(([, data]) => ({
+         
+            ...(data as Task),
+          }))
+          .filter((task) => showAllTasks || task.clientId === newClientId)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 10);
+  
+        setRecentTasks(tasksList);
+      };
 
     // Set up listeners
     onValue(connectRef, handleConnection);
@@ -259,11 +308,14 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
     // Cleanup
     return () => {
+      if (presenceCleanup) {
+        presenceCleanup();
+      }
       off(connectRef);
       off(presenceRef);
       off(clientTasksRef);
     };
-  }, [showAllTasks]);
+  }, [showAllTasks, user.uid, user.email]);
 
   // Task execution helper
   const executeTask = async (taskId: string, task: Task) => {
