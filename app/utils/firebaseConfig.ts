@@ -74,3 +74,59 @@ export const updateNodeStatus = async (
       throw new Error(`Failed to update status: ${(error as Error).message}`);
     }
   };
+
+
+  export interface ChatMessage {
+    id?: string;
+    senderId: string;
+    senderName: string;
+    content: string;
+    timestamp: string;
+    type: 'message' | 'status';
+  }
+  
+  export interface NetworkNode {
+    id?: string;
+    status?: NodeStatus;
+    lastSeen?: string;
+    type?: 'client' | 'worker';
+    connections?: string[];
+    metadata?: {
+      cpu?: number;
+      memory?: number;
+      tasks?: number;
+    };
+  }
+
+export async function sendChatMessage(senderId: string, senderName: string, content: string): Promise<string | null> {
+  const messagesRef = ref(database, 'messages');
+  const newMessageRef = push(messagesRef);
+  const message: ChatMessage = {
+    senderId,
+    senderName,
+    content,
+    timestamp: new Date().toISOString(),
+    type: 'message'
+  };
+  
+  try {
+    await set(newMessageRef, message);
+    return newMessageRef.key;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    return null;
+  }
+}
+
+export async function updateNodeMetadata(nodeId: string, metadata: Partial<NetworkNode['metadata']>): Promise<void> {
+  const nodeRef = ref(database, `presence/${nodeId}`);
+  try {
+    await update(nodeRef, {
+      metadata: metadata,
+      lastSeen: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating node metadata:', error);
+    throw error;
+  }
+}

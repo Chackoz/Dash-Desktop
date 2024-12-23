@@ -51,6 +51,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { githubDark } from '@uiw/codemirror-theme-github';
 import { useTheme } from "./ThemeProvider";
+import NetworkPanel from "./NetworkPanel";
 
 interface DashNetworkProps {
     user: User;
@@ -347,7 +348,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           setOutput(
             `Task ${taskId}\nStatus: ${task.status}\nWorker: ${
               task.assignedTo || "Unknown"
-            }\n${task.output || ""}`
+            }\nOutput :\n${task.output || ""}`
           );
         }
       });
@@ -579,6 +580,7 @@ requests"
                 </label>
               </div>
             )}
+         
 
             <div className="flex space-x-4 mt-4">
               <Button
@@ -609,6 +611,7 @@ requests"
                 </AlertDescription>
               </Alert>
             )}
+            
 
             <div className="mt-4">
               <div className="flex items-center space-x-2 mb-2">
@@ -624,6 +627,9 @@ requests"
           </div>
         </div>
       </div>
+      <div className="col-span-1 h-full" >
+    <NetworkPanel userId={clientId} userName={user.displayName||clientId}/>
+  </div>
 
       <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
         {selectedTask && (
