@@ -1,4 +1,5 @@
-# DASH - Distributed Automated Scheduler Hub
+
+# DASH - Distributed Adaptive Serverless Hosting
 
 ## What is DASH?
 DASH is a distributed code execution and deployment system designed using **React**, **Firebase**, and **Tauri APIs**. It allows clients to submit code, schedule tasks, and execute them efficiently through connected nodes. DASH focuses on simplifying task scheduling and automating code execution workflows.
