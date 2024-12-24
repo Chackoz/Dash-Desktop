@@ -24,19 +24,13 @@ struct SystemSpecs {
 #[tauri::command]
 fn get_system_specs() -> SystemSpecs {
     let os = std::env::consts::OS.to_string();
-    
     let cpu = format!(
         "{} cores @ {} MHz",
         cpu_num().unwrap_or(0),
         cpu_speed().unwrap_or(0)
     );
-    
-    // Handle memory info without using default
     let ram = if let Ok(mem) = mem_info() {
-        format!(
-            "{:.1} GB",
-            mem.total as f64 / (1024.0 * 1024.0)
-        )
+        format!("{:.1} GB", mem.total as f64 / (1024.0 * 1024.0))
     } else {
         "Unknown".to_string()
     };
@@ -50,33 +44,92 @@ fn get_system_specs() -> SystemSpecs {
     }
 }
 
-fn is_dangerous_command(code: &str) -> bool {
-    let dangerous_patterns = [
-        "os.system", "subprocess", "shutdown", 
-        "rm -rf", "del", "format",
-        // Add more patterns
-    ];
+async fn run_with_docker(
+    code: &str, 
+    requirements: &[String], 
+    container_id: &str
+) -> Result<String, String> {
+    let temp_dir = tempfile::TempDir::new()
+        .map_err(|e| format!("Failed to create temp directory: {}", e))?;
     
-    for pattern in dangerous_patterns {
-        if code.contains(pattern) {
-            return true;
-        }
+    let script_path = temp_dir.path().join("script.py");
+    fs::write(&script_path, code)
+        .map_err(|e| format!("Failed to write Python script: {}", e))?;
+    
+    // Only include pip install if there are requirements
+    let dockerfile = if requirements.is_empty() {
+        String::from(
+            "FROM python:3.9-slim\n\
+             WORKDIR /app\n\
+             COPY script.py /app/\n\
+             CMD [\"python\", \"script.py\"]"
+        )
+    } else {
+        format!(
+            "FROM python:3.9-slim\n\
+             WORKDIR /app\n\
+             COPY script.py /app/\n\
+             RUN pip install --no-cache-dir {}\n\
+             CMD [\"python\", \"script.py\"]",
+            requirements.join(" ")
+        )
+    };
+    
+    let dockerfile_path = temp_dir.path().join("Dockerfile");
+    fs::write(&dockerfile_path, dockerfile)
+        .map_err(|e| format!("Failed to write Dockerfile: {}", e))?;
+    
+    // Rest of the function remains the same...
+    let build_output = Command::new("docker")
+        .args([
+            "build",
+            "--no-cache",
+            "-t",
+            &format!("python-runner-{}", container_id),
+            temp_dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .map_err(|e| format!("Docker build command failed: {}", e))?;
+
+    if !build_output.status.success() {
+        return Err(format!("Docker build failed:\n{}", String::from_utf8_lossy(&build_output.stderr)));
     }
-    false
+
+    let run_output = Command::new("docker")
+        .args([
+            "run",
+            "--rm",
+            "--name", &format!("runner-{}", container_id),
+            "--memory", "512m",
+            "--cpus", "1",
+            "--network", "none",
+            "--security-opt", "no-new-privileges",
+            &format!("python-runner-{}", container_id),
+        ])
+        .output()
+        .map_err(|e| format!("Docker run failed: {}", e))?;
+    
+    let _ = Command::new("docker")
+        .args(["rmi", "-f", &format!("python-runner-{}", container_id)])
+        .output();
+    
+    let stdout = String::from_utf8_lossy(&run_output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&run_output.stderr).to_string();
+    
+    if !run_output.status.success() {
+        Err(format!("Container execution failed:\nOutput:\n{}\nErrors:\n{}", stdout, stderr))
+    } else if !stderr.is_empty() {
+        Ok(format!("Docker Output:\n{}\nWarnings:\n{}", stdout, stderr))
+    } else {
+        Ok(stdout)
+    }
 }
 
-#[tauri::command]
-async fn run_python_code(code: String, requirements: Option<String>) -> Result<String, String> {
-    // Validate input size
-    if code.len() > 10_000 {
-        return Err("Code is too large!".to_string());
-    }
-    if is_dangerous_command(&code) {
-        return Err("Potentially dangerous command detected".to_string());
-    }
-
-    // Create a unique directory for the virtual environment
-    let venv_id = Uuid::new_v4().to_string();
+async fn run_with_venv(
+    code: &str, 
+    requirements: &[String], 
+    venv_id: &str
+) -> Result<String, String> {
     let venv_path = std::env::temp_dir().join(format!("venv_{}", venv_id));
     
     // Create virtual environment
@@ -91,40 +144,31 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
             String::from_utf8_lossy(&create_venv.stderr)));
     }
 
-    // Determine the path to the virtual environment's Python executable
+    // Get venv Python path
     let venv_python = if cfg!(windows) {
         venv_path.join("Scripts").join("python.exe")
     } else {
         venv_path.join("bin").join("python")
     };
 
-    // Install requirements if provided
-    if let Some(reqs_str) = requirements {
-        if !reqs_str.is_empty() {
-            let reqs: Vec<&str> = reqs_str.split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .collect();
+    // Install requirements if any
+    if !requirements.is_empty() {
+        let mut install_cmd = Command::new(&venv_python);
+        install_cmd.args(["-m", "pip", "install"]);
+        install_cmd.args(requirements);
+        
+        let install_output = install_cmd
+            .output()
+            .map_err(|e| format!("Failed to install requirements: {}", e))?;
 
-            if !reqs.is_empty() {
-                let mut install_cmd = Command::new(venv_python.clone());
-                install_cmd.args(["-m", "pip", "install"]);
-                install_cmd.args(&reqs);
-                
-                let install_output = install_cmd
-                    .output()
-                    .map_err(|e| format!("Failed to install requirements: {}", e))?;
-
-                if !install_output.status.success() {
-                    let _ = fs::remove_dir_all(&venv_path);
-                    return Err(format!("Failed to install requirements: {}", 
-                        String::from_utf8_lossy(&install_output.stderr)));
-                }
-            }
+        if !install_output.status.success() {
+            let _ = fs::remove_dir_all(&venv_path);
+            return Err(format!("Failed to install requirements: {}", 
+                String::from_utf8_lossy(&install_output.stderr)));
         }
     }
 
-    // Create a temporary file for the code
+    // Create temporary file for the code
     let mut temp_file = NamedTempFile::new()
         .map_err(|e| format!("Failed to create temp file: {}", e))?;
     
@@ -139,18 +183,150 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
         .output()
         .map_err(|e| format!("Failed to execute Python: {}", e))?;
 
-    // Clean up
+    // Cleanup
     let _ = fs::remove_dir_all(&venv_path);
 
-    // Handle output
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if !stderr.is_empty() {
-        Err(format!("Output:\n{}\nErrors:\n{}", stdout, stderr))
+        Err(format!("Venv Output:\n{}\nErrors:\n{}", stdout, stderr))
     } else {
         Ok(stdout.to_string())
     }
+}
+
+#[tauri::command]
+async fn run_python_code(code: String, requirements: Option<String>) -> Result<String, String> {
+    if code.len() > 10_000 {
+        return Err("Code is too large!".to_string());
+    }
+
+    let run_id = Uuid::new_v4().to_string();
+    
+    // Parse requirements
+    let requirements: Vec<String> = requirements
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // match run_with_docker(&code, &requirements, &run_id).await {
+    //     Ok(output) => Ok(format!("[Docker Execution]\n{}", output)),
+    //     Err(e) => {
+    //         match run_with_venv(&code, &requirements, &run_id).await {
+    //             Ok(output) => Ok(format!("[Venv Execution]\n{}", output)),
+    //             Err(e) => Err(format!("Docker failed, then venv failed:\n{}", e))
+    //         }
+    //     }
+    // }
+    run_with_docker(&code, &requirements, &run_id).await
+    
+}
+
+#[tauri::command]
+async fn run_docker_hub_image(
+    image: String,
+    command: Option<Vec<String>>,
+    memory_limit: Option<String>,
+    cpu_limit: Option<String>,
+    id: Option<String>
+) -> Result<String, String> {
+    let container_id = id.unwrap_or_else(|| "default".to_string());
+    
+    let pull_output = Command::new("docker")
+        .args(["pull", &image])
+        .output()
+        .map_err(|e| format!("Failed to pull Docker image: {}", e))?;
+
+    if !pull_output.status.success() {
+        return Err(format!("Failed to pull image:\n{}", 
+            String::from_utf8_lossy(&pull_output.stderr)));
+    }
+
+    let mut run_args = Vec::new();
+    run_args.extend(vec![
+        "run".to_string(),
+        "--rm".to_string(),
+        "--name".to_string(), 
+        format!("hub-runner-{}", container_id),
+        "--network".to_string(), 
+        "none".to_string(),
+        "--security-opt".to_string(), 
+        "no-new-privileges".to_string(),
+    ]);
+
+    if let Some(mem) = memory_limit {
+        run_args.extend(vec!["--memory".to_string(), mem]);
+    } else {
+        run_args.extend(vec!["--memory".to_string(), "512m".to_string()]);
+    }
+
+    if let Some(cpu) = cpu_limit {
+        run_args.extend(vec!["--cpus".to_string(), cpu]);
+    } else {
+        run_args.extend(vec!["--cpus".to_string(), "1".to_string()]);
+    }
+
+    run_args.push(image);
+
+    if let Some(cmd) = command {
+        run_args.extend(cmd);
+    }
+
+    let run_output = Command::new("docker")
+        .args(&run_args)
+        .output()
+        .map_err(|e| format!("Docker run failed: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&run_output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&run_output.stderr).to_string();
+
+    if !run_output.status.success() {
+        Err(format!("Container execution failed:\nOutput:\n{}\nErrors:\n{}", stdout, stderr))
+    } else if !stderr.is_empty() {
+        Ok(format!("Docker Output:\n{}\nWarnings:\n{}", stdout, stderr))
+    } else {
+        Ok(stdout)
+    }
+}
+
+#[tauri::command]
+async fn stop_docker_container(container_id: String) -> Result<String, String> {
+    // Stop any running container with the given ID pattern
+    let stop_output = Command::new("docker")
+        .args([
+            "ps",
+            "-q",
+            "--filter",
+            &format!("name={}","hub-runner-default")
+        ])
+        .output()
+        .map_err(|e| format!("Failed to list containers: {}", e))?;
+
+    let container_ids = String::from_utf8_lossy(&stop_output.stdout);
+    
+    if container_ids.is_empty() {
+        return Ok("No running containers found.".to_string());
+    }
+
+    for id in container_ids.split_whitespace() {
+        let stop_result = Command::new("docker")
+            .args(["stop", id])
+            .output()
+            .map_err(|e| format!("Failed to stop container: {}", e))?;
+
+        if !stop_result.status.success() {
+            return Err(format!(
+                "Failed to stop container {}:\n{}", 
+                id, 
+                String::from_utf8_lossy(&stop_result.stderr)
+            ));
+        }
+    }
+
+    Ok("Container(s) stopped successfully.".to_string())
 }
 
 fn main() {
@@ -159,8 +335,10 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             run_python_code,
-            get_system_specs
+            get_system_specs,
+            run_docker_hub_image,
+            stop_docker_container 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
+        }

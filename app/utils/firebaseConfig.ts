@@ -19,38 +19,65 @@ export const app = initializeApp(firebaseConfig);
 export const database = getDatabase(app);
 export const auth = getAuth(app);
 
-export interface Task {
-    id?: string;
-    clientId: string;
-    code: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    output?: string | null;
-    createdAt: string;
-    updatedAt?: string;
-    workerId?: string;
-    error?: string;
-    requirements?: string;
+
+export interface DockerConfig {
+  image: string;
+  command?: string[];
+  memoryLimit?: string;
+  cpuLimit?: string;
 }
 
-export async function createTask(clientId: string, code: string, requirements?: string): Promise<string | null> {
-    const tasksRef = ref(database, 'tasks');
-    const newTaskRef = push(tasksRef);
-    const task: Task = {
-        clientId,
-        code,
-        requirements,
-        status: 'pending',
-        output: null,
-        createdAt: new Date().toISOString(),
-    };
-    
-    try {
-        await set(newTaskRef, task);
-        return newTaskRef.key;
-    } catch (error) {
-        console.error('Error creating task:', error);
-        return null;
-    }
+
+export interface Task {
+  id?: string;
+  clientId: string;
+  code?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed'|'assigned';
+  output?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  workerId?: string;
+  error?: string;
+  requirements?: string;
+  dockerConfig?: DockerConfig;
+  taskType: 'code' | 'docker';
+  assignedTo?: string;
+}
+
+// Update the createTask function to support both code and Docker tasks
+export async function createTask(
+  clientId: string, 
+  code: string | null, 
+  requirements?: string,
+  dockerConfig?: DockerConfig
+): Promise<string | null> {
+  const tasksRef = ref(database, 'tasks');
+  const newTaskRef = push(tasksRef);
+  
+  const task: Task = {
+    clientId,
+    status: 'pending',
+    output: null,
+    createdAt: new Date().toISOString(),
+    taskType: dockerConfig ? 'docker' : 'code'
+  };
+
+  if (code) {
+    task.code = code;
+    task.requirements = requirements;
+  }
+
+  if (dockerConfig) {
+    task.dockerConfig = dockerConfig;
+  }
+  
+  try {
+    await set(newTaskRef, task);
+    return newTaskRef.key;
+  } catch (error) {
+    console.error('Error creating task:', error);
+    return null;
+  }
 }
 
 export type NodeStatus = "idle" | "online" | "offline" | "busy";

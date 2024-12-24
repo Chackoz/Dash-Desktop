@@ -16,7 +16,7 @@ export const LoadingPage = () => {
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          className="rounded-full "
+          className="rounded-full hidden"
         >
           {isDarkMode ? (
             <Sun className="w-4 h-4" />
