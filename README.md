@@ -11,7 +11,16 @@ DASH is a distributed code execution and deployment system designed using **Reac
 - **Scalability**: Easily scalable with multiple connected nodes.
 
 # Screenshots
-![image](https://github.com/user-attachments/assets/a4dceaa4-dee8-4357-9bcf-1c33e7fc62a4)
+
+
+
+![image](https://github.com/user-attachments/assets/1c0f25e2-1441-4011-8639-96c70539330f)
+
+![image](https://github.com/user-attachments/assets/8f5e334e-5885-4fa2-b9fd-a5541ecc98ae)
+
+![image](https://github.com/user-attachments/assets/030337eb-99b5-4c32-aa98-2c009affebd6)
+
+
 
 ## Architecture
 ```
@@ -33,21 +42,21 @@ DASH is a distributed code execution and deployment system designed using **Reac
 
 ## Technical Details
 ### Frontend
-- **Framework**: React.js
+- **Framework**: Tauri + Next.js
 - **Styling**: Tailwind CSS
 - **Tauri API**: Used for secure desktop interactions.
 
 ### Backend
 - **Database**: Firebase Realtime Database and Firestore.
-- **Deployment**: Firebase Hosting and Cloud Functions.
+- **Deployment**: Scheduler in Cloud Functions
 
 ### Task Scheduler
-- **Language**: JavaScript/Node.js
+- **Language**: Python
 - **Libraries**: Firebase Admin SDK
 - **Task Distribution**: Custom algorithm for dynamic task allocation.
 
 ## How It Works
-1. **Initialize Firebase** - Connect the app to Firebase for database and authentication.
+1. **Initialize Dash** - Connect the app.
 2. **Submit Code** - Clients upload code with metadata to Firebase.
 3. **Scheduler Assignment** - Scheduler assigns pending tasks to idle clients.
 4. **Execution & Reporting** - Clients execute the assigned code and update the results.
