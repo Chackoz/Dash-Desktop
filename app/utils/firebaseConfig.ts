@@ -25,6 +25,7 @@ export interface DockerConfig {
   command?: string[];
   memoryLimit?: string;
   cpuLimit?: string;
+  timeLimit?: string;
 }
 
 
@@ -42,6 +43,7 @@ export interface Task {
   dockerConfig?: DockerConfig;
   taskType: 'code' | 'docker';
   assignedTo?: string;
+  timeLimit?:string;
 }
 
 // Update the createTask function to support both code and Docker tasks

@@ -116,6 +116,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [dockerCommand, setDockerCommand] = useState("");
   const [memoryLimit, setMemoryLimit] = useState("512m");
   const [cpuLimit, setCpuLimit] = useState("1");
+  //const [timeLimit, setTimeLimit] = useState("5m");
   const [isStoppingContainer, setIsStoppingContainer] = useState(false);
 
   const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
@@ -124,22 +125,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Task Details</DialogTitle>
-            {(task.status === "running" || task.status === "assigned") && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleStopContainer(task.id || "")}
-                disabled={isStoppingContainer}
-                className="flex items-center gap-2"
-              >
-                {isStoppingContainer ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : (
-                  <AlertCircle className="w-4 h-4" />
-                )}
-                <span>Stop Container</span>
-              </Button>
-            )}
+          
           </div>
         </DialogHeader>
         <div className="space-y-4">
@@ -298,7 +284,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         console.log("Task:", taskId, typedTask);
         if (
           typedTask.assignedTo === newClientId &&
-          typedTask.status === "assigned" 
+          typedTask.status === "assigned"
         ) {
           console.log("Executing assigned task:", taskId);
           await executeTask(taskId, typedTask);
@@ -362,140 +348,128 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     setNodeStatus("idle");
     updateNodeStatus(clientId, "idle");
   };
- 
 
-const handleDistribute = async () => {
-  setOutput("");
-  if (nodeStatus === "offline" || !clientId) {
-    setOutput("Error: Cannot distribute task. Please check your connection.");
-    return;
-  }
-
-  if (isDockerMode) {
-    // Validate Docker configuration
-    const validationError = validateDockerConfig(dockerImage, memoryLimit, cpuLimit);
-    if (validationError) {
-      setOutput(`Error: ${validationError}`);
+  const handleDistribute = async () => {
+    setOutput("");
+    if (nodeStatus === "offline" || !clientId) {
+      setOutput("Error: Cannot distribute task. Please check your connection.");
       return;
     }
 
-    // Parse and validate Docker command
-    const commandArgs = dockerCommand ? parseDockerCommand(dockerCommand) : [];
-
-    setIsLoading(true);
-    try {
-      const dockerConfig: DockerConfig = {
-        image: dockerImage,
-        command: commandArgs,
+    if (isDockerMode) {
+      // Validate Docker configuration
+      const validationError = validateDockerConfig(
+        dockerImage,
         memoryLimit,
         cpuLimit
-      };
-
-      const taskId = await createTask(clientId, null, undefined, dockerConfig);
-      setOutput(
-        `Docker task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`
       );
-      
-      if (!taskId) {
-        throw new Error("Failed to create Docker task");
+      if (validationError) {
+        setOutput(`Error: ${validationError}`);
+        return;
       }
 
-      setOutput(
-        `Docker task distributed successfully!\n` +
-        `Task ID: ${taskId}\n` +
-        `Status: Pending\n` +
-        `Image: ${dockerImage}\n` +
-        `Command: ${commandArgs.join(' ')}\n` +
-        `Memory: ${memoryLimit}\n` +
-        `CPU: ${cpuLimit}`
-      );
+      // Parse and validate Docker command
+      const commandArgs = dockerCommand
+        ? parseDockerCommand(dockerCommand)
+        : [];
 
-      // Monitor task status
-      const taskRef = ref(database, `tasks/${taskId}`);
-      onValue(taskRef, (snapshot) => {
-        const task = snapshot.val();
-        if (task && task.status !== "pending") {
-          const statusInfo = 
+      setIsLoading(true);
+      try {
+        const dockerConfig: DockerConfig = {
+          image: dockerImage,
+          command: commandArgs,
+          memoryLimit,
+          cpuLimit,
+          //timeLimit,
+        };
+
+        const taskId = await createTask(
+          clientId,
+          null,
+          undefined,
+          dockerConfig
+        );
+        setOutput(
+          `Docker task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`
+        );
+
+        if (!taskId) {
+          throw new Error("Failed to create Docker task");
+        }
+
+        setOutput(
           `Docker task distributed successfully!\n` +
-            `Task ${taskId}\n` +
-            `Status: ${task.status}\n` +
-            `Worker: ${task.assignedTo || "Unknown"}\n\n` +
-            (task.error ? `Error: ${task.error}\n\n` : "") +
-            (task.output || "");
-            
-          setOutput(statusInfo);
-          
-          // Handle task completion or failure
-          if (task.status === "completed" || task.status === "failed") {
-            // Optionally clean up the listener
-            off(taskRef);
+            `Task ID: ${taskId}\n` +
+            `Status: Pending\n` +
+            `Image: ${dockerImage}\n` +
+            `Command: ${commandArgs.join(" ")}\n` +
+            `Memory: ${memoryLimit}\n` +
+            `CPU: ${cpuLimit}\n` //+
+          //  `Time Limit: ${timeLimit}`
+        );
+
+        // Monitor task status
+        const taskRef = ref(database, `tasks/${taskId}`);
+        onValue(taskRef, (snapshot) => {
+          const task = snapshot.val();
+          if (task && task.status !== "pending") {
+            const statusInfo =
+              `Docker task distributed successfully!\n` +
+              `Task ${taskId}\n` +
+              `Status: ${task.status}\n` +
+              `Worker: ${task.assignedTo || "Unknown"}\n\n` +
+              (task.error ? `Error: ${task.error}\n\n` : "") +
+              (task.output || "");
+
+            setOutput(statusInfo);
+
+            // Handle task completion or failure
+            if (task.status === "completed" || task.status === "failed") {
+              // Optionally clean up the listener
+              off(taskRef);
+            }
           }
-        }
-      });
+        });
+      } catch (error) {
+        setOutput(
+          `Error distributing Docker task: ${(error as Error).message}`
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Existing code task handling
+      if (!code) {
+        setOutput("Error: Please enter code to distribute.");
+        return;
+      }
 
-    } catch (error) {
-      setOutput(`Error distributing Docker task: ${(error as Error).message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  } else {
-    // Existing code task handling
-    if (!code) {
-      setOutput("Error: Please enter code to distribute.");
-      return;
-    }
+      setIsLoading(true);
+      try {
+        const taskId = await createTask(clientId, code, requirements);
+        setOutput(
+          `Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n` +
+            (isDockerMode ? `Docker Image: ${dockerImage}\n` : "")
+        );
 
-    setIsLoading(true);
-    try {
-      const taskId = await createTask(clientId, code, requirements);
-      setOutput(
-        `Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n` +
-          (isDockerMode ? `Docker Image: ${dockerImage}\n` : "")
-      );
-
-      const taskRef = ref(database, `tasks/${taskId}`);
-      onValue(taskRef, (snapshot) => {
-        const task = snapshot.val();
-        if (task && task.status !== "pending") {
-          setOutput(
-            `Task ${taskId}\nStatus: ${task.status}\nWorker: ${
-              task.assignedTo || "Unknown"
-            }\n\n${task.output || ""}`
-          );
-        }
-      });
-    } catch (error) {
-      setOutput(`Error distributing task: ${(error as Error).message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-};
-  // Add this function to your component
-  const handleStopContainer = async (taskId: string) => {
-    if (!taskId) return;
-
-    setIsStoppingContainer(true);
-    try {
-      const result = await invoke<string>("stop_docker_container", {
-        containerId: taskId,
-      });
-      setOutput(`Stop container result: ${result}`);
-
-      // Update task status in Firebase if needed
-      const taskRef = ref(database, `tasks/${taskId}`);
-      await update(taskRef, {
-        status: "stopped",
-        stoppedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      setOutput(`Error stopping container: ${error}`);
-    } finally {
-      setIsStoppingContainer(false);
+        const taskRef = ref(database, `tasks/${taskId}`);
+        onValue(taskRef, (snapshot) => {
+          const task = snapshot.val();
+          if (task && task.status !== "pending") {
+            setOutput(
+              `Task ${taskId}\nStatus: ${task.status}\nWorker: ${
+                task.assignedTo || "Unknown"
+              }\n\n${task.output || ""}`
+            );
+          }
+        });
+      } catch (error) {
+        setOutput(`Error distributing task: ${(error as Error).message}`);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
-
-  
   const executeTask = async (taskId: string, task: Task) => {
     console.log("Executing task:", task);
     setClientId(localStorage.getItem("clientId") || "");
@@ -512,19 +486,27 @@ const handleDistribute = async () => {
 
       let result;
       if (task.taskType === "docker" && task.dockerConfig) {
-        
         result = await invoke<string>("run_docker_hub_image", {
           image: task.dockerConfig.image,
           command: task.dockerConfig.command || [],
           memoryLimit: task.dockerConfig.memoryLimit || "512m",
           cpuLimit: task.dockerConfig.cpuLimit || "1",
-          id:task.id
+          id: task.id,
+          timeLimit: task.timeLimit,
         });
         console.log("Docker task result:", result);
         console.log("Task ID:", taskId);
-        console.log("Image:", task.dockerConfig.image, "Command:", task.dockerConfig.command, "Memory Limit:", task.dockerConfig.memoryLimit, "CPU Limit:", task.dockerConfig.cpuLimit);
+        console.log(
+          "Image:",
+          task.dockerConfig.image,
+          "Command:",
+          task.dockerConfig.command,
+          "Memory Limit:",
+          task.dockerConfig.memoryLimit,
+          "CPU Limit:",
+          task.dockerConfig.cpuLimit
+        );
       } else if (task.code) {
-        
         result = await invoke<string>("run_python_code", {
           code: task.code,
           requirements: task.requirements,
@@ -568,6 +550,7 @@ const handleDistribute = async () => {
         command: dockerCommand ? dockerCommand.split(" ") : [],
         memoryLimit,
         cpuLimit,
+      //  timeLimit
       });
       setOutput(`Docker Output:\n${result}`);
     } catch (error) {
@@ -576,6 +559,29 @@ const handleDistribute = async () => {
       setIsLoading(false);
       setNodeStatus("idle");
       updateNodeStatus(clientId, "idle");
+    }
+  };
+
+  const handleStopContainer = async (taskId?: string) => {
+    
+
+    setIsStoppingContainer(true);
+    try {
+      const result = await invoke<string>("stop_docker_container", {
+        containerId: taskId?taskId:"df",
+      });
+      setOutput(`Stop container result: ${result}`);
+
+      // Update task status in Firebase if needed
+      const taskRef = ref(database, `tasks/${taskId}`);
+      await update(taskRef, {
+        status: "stopped",
+        stoppedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.log(`Error stopping container: ${error}`);
+    } finally {
+      setIsStoppingContainer(false);
     }
   };
 
@@ -597,43 +603,47 @@ const handleDistribute = async () => {
     if (!image.trim()) {
       return "Docker image is required";
     }
-    
+
     // Validate memory format (e.g., 512m, 1g, 2gb)
     if (memoryLimit && !/^\d+[kmg]?b?$/i.test(memoryLimit)) {
       return "Invalid memory limit format (e.g., 512m, 1g)";
     }
-  
+
     // Validate CPU format (number)
     if (cpuLimit && !/^\d+(\.\d+)?$/.test(cpuLimit)) {
       return "Invalid CPU limit format (e.g., 1, 0.5)";
     }
-  
+
     return null;
   };
-  
+
+ 
+
+
+
   const parseDockerCommand = (command: string): string[] => {
     // Handle quoted arguments properly
     const args: string[] = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
-  
+
     for (const char of command) {
       if (char === '"' || char === "'") {
         inQuotes = !inQuotes;
-      } else if (char === ' ' && !inQuotes) {
+      } else if (char === " " && !inQuotes) {
         if (current) {
           args.push(current);
-          current = '';
+          current = "";
         }
       } else {
         current += char;
       }
     }
-    
+
     if (current) {
       args.push(current);
     }
-  
+
     return args;
   };
 
@@ -741,14 +751,14 @@ const handleDistribute = async () => {
                         {`Status: ${task.status}`}
                       </div>
                     </div>
-                    {(task.status === "running" ||
+                    {/* {(task.status === "running" ||
                       task.status === "assigned") && (
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleStopContainer(task.id || "");
+                          handleStopContainer(task.id ? task.id : task.clientId);
                         }}
                         disabled={isStoppingContainer}
                         className="flex items-center gap-2"
@@ -760,7 +770,7 @@ const handleDistribute = async () => {
                         )}
                         <span>Stop</span>
                       </Button>
-                    )}
+                    )} */}
                   </div>
                   <span className="text-xs text-muted-foreground">
                     {new Date(task.createdAt).toLocaleTimeString()}
@@ -802,6 +812,22 @@ const handleDistribute = async () => {
                 onCheckedChange={setIsDockerMode}
               />
             </div>
+          
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleStopContainer("df" )}
+                disabled={isStoppingContainer}
+                className="flex items-center gap-2 hidden"
+              >
+                {isStoppingContainer ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <AlertCircle className="w-4 h-4" />
+                )}
+                <span>Stop Container</span>
+              </Button>
+           
           </div>
         </div>
 
@@ -850,7 +876,17 @@ const handleDistribute = async () => {
                       onChange={(e) => setCpuLimit(e.target.value)}
                     />
                   </div>
+                  {/* <div className="space-y-2">
+                    <label className="text-sm font-medium">Time Limit</label>
+                    <input
+                      className="w-full px-3 py-2 rounded bg-secondary/50"
+                      placeholder="e.g., 1"
+                      value={timeLimit}
+                      onChange={(e) => setTimeLimit(e.target.value)}
+                    />
+                  </div> */}
                 </div>
+
                 <Alert>
                   <AlertDescription className="text-sm">
                     Docker containers run with network disabled and limited
@@ -877,7 +913,6 @@ const handleDistribute = async () => {
                     <Network className="w-4 h-4" />
                     <span>Distribute Docker</span>
                   </Button>
-                  
                 </div>
               </div>
             ) : (
@@ -995,7 +1030,9 @@ const handleDistribute = async () => {
               <textarea
                 value={output}
                 readOnly
-                className="w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none h-48 focus:outline-none focus:ring-1"
+                className={`w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none h-full ${
+                  isDockerMode ? "min-h-[35vh] " : "min-h-[18vh] "
+                }focus:outline-none focus:ring-1`}
               />
             </div>
           </div>

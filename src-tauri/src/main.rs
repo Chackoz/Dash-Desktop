@@ -105,6 +105,7 @@ async fn run_with_docker(
             "--network", "none",
             "--security-opt", "no-new-privileges",
             &format!("python-runner-{}", container_id),
+            
         ])
         .output()
         .map_err(|e| format!("Docker run failed: {}", e))?;
@@ -231,7 +232,8 @@ async fn run_docker_hub_image(
     command: Option<Vec<String>>,
     memory_limit: Option<String>,
     cpu_limit: Option<String>,
-    id: Option<String>
+    id: Option<String>,
+    timeout: Option<String>,
 ) -> Result<String, String> {
     let container_id = id.unwrap_or_else(|| "default".to_string());
     
@@ -256,7 +258,7 @@ async fn run_docker_hub_image(
         "--security-opt".to_string(), 
         "no-new-privileges".to_string(),
     ]);
-
+    
     if let Some(mem) = memory_limit {
         run_args.extend(vec!["--memory".to_string(), mem]);
     } else {
@@ -274,6 +276,7 @@ async fn run_docker_hub_image(
     if let Some(cmd) = command {
         run_args.extend(cmd);
     }
+  
 
     let run_output = Command::new("docker")
         .args(&run_args)
@@ -293,14 +296,14 @@ async fn run_docker_hub_image(
 }
 
 #[tauri::command]
-async fn stop_docker_container(container_id: String) -> Result<String, String> {
-    // Stop any running container with the given ID pattern
+async fn stop_docker_container(id: String) -> Result<String, String> {
+    
     let stop_output = Command::new("docker")
         .args([
             "ps",
             "-q",
             "--filter",
-            &format!("name={}","hub-runner-default")
+            "name=hub-runner-default",
         ])
         .output()
         .map_err(|e| format!("Failed to list containers: {}", e))?;
