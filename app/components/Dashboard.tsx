@@ -296,6 +296,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         .map(([, data]) => ({
           ...(data as Task),
         }))
+        .filter((task) => task.userId === user.uid)
         .filter((task) => showAllTasks || task.clientId === newClientId)
         .sort(
           (a, b) =>
@@ -693,6 +694,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             </div>
             <div className="text-sm text-muted-foreground mt-2">
               {"Client ID : " + clientId?.replaceAll("-", "")}
+            </div>
+            <div className="text-sm text-muted-foreground mt-2">
+              {"User ID : " + user.uid  }
             </div>
           </CardHeader>
         </Card>

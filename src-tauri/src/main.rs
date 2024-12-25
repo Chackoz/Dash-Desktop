@@ -12,6 +12,7 @@ use uuid::Uuid;
 use serde::Serialize;
 use sys_info::{cpu_num, cpu_speed, mem_info};
 
+
 #[derive(Serialize)]
 struct SystemSpecs {
     os: String,
@@ -19,6 +20,34 @@ struct SystemSpecs {
     ram: String,
     gpu: Option<String>,
     gpu_vram: Option<String>,
+    docker: bool,
+    python: Option<String>,
+    node: Option<String>,
+    rust: Option<String>,
+}
+
+fn check_docker() -> bool {
+    Command::new("docker")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn get_version(cmd: &str, args: &[&str]) -> Option<String> {
+    Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|v| v.trim().to_string())
+            } else {
+                None
+            }
+        })
 }
 
 #[tauri::command]
@@ -35,14 +64,24 @@ fn get_system_specs() -> SystemSpecs {
         "Unknown".to_string()
     };
     
+    let docker = check_docker();
+    let python = get_version("python", &["--version"]);
+    let node = get_version("node", &["--version"]);
+    let rust = get_version("rustc", &["--version"]);
+    
     SystemSpecs {
         os,
         cpu,
         ram,
         gpu: None,
         gpu_vram: None,
+        docker,
+        python,
+        node,
+        rust,
     }
 }
+
 
 async fn run_with_docker(
     code: &str, 

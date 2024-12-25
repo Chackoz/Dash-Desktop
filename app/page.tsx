@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import { auth } from '@/app/utils/firebaseConfig';
-import { onAuthStateChanged} from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { LoadingPage } from './components/LoadingPage';
 import { AuthPage } from './components/AuthPage';
 import DashNetwork from './components/Dashboard';
@@ -15,14 +15,13 @@ export default function Home() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   if (loading) {
-    return <LoadingPage />;
+    return <LoadingPage onLoadingComplete={() => setLoading(false)} />;
   }
 
   if (!user) {

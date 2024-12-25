@@ -44,6 +44,7 @@ export interface Task {
   taskType: 'code' | 'docker';
   assignedTo?: string;
   timeLimit?:string;
+  userId?:string;
 }
 
 // Update the createTask function to support both code and Docker tasks
@@ -55,13 +56,14 @@ export async function createTask(
 ): Promise<string | null> {
   const tasksRef = ref(database, 'tasks');
   const newTaskRef = push(tasksRef);
-  
+  const userId = auth.currentUser?.uid;
   const task: Task = {
     clientId,
     status: 'pending',
     output: null,
     createdAt: new Date().toISOString(),
-    taskType: dockerConfig ? 'docker' : 'code'
+    taskType: dockerConfig ? 'docker' : 'code',
+    userId: userId,
   };
 
   if (code) {

@@ -43,7 +43,7 @@ export const AuthPage = () => {
 
   const saveUserSpecs = async (userId: string) => {
     const specs = await getSystemSpecs();
-    const userSpecsRef = ref(database, `users/${userId}/system_specs`);
+    const userSpecsRef = ref(database, `users/${userId}/main/system_specs`);
     await set(userSpecsRef, {
       ...specs,
       lastUpdated: new Date().toISOString()
