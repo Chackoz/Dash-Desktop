@@ -789,8 +789,8 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         <div className="border-b p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex space-x-4">
+          <div className="flex items-center justify-between relative w-full h-8">
+            {!isDockerMode && <div className="flex space-x-4">
               <Button
                 variant={activeTab === "editor" ? "secondary" : "ghost"}
                 onClick={() => setActiveTab("editor")}
@@ -808,7 +808,8 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 <span>Upload</span>
               </Button>
             </div>
-            <div className="flex items-center space-x-2">
+}
+            <div className="flex items-center space-x-2 absolute right-4">
               <Terminal className="w-4 h-4" />
               <span className="text-sm">Docker Mode</span>
               <Switch
@@ -822,7 +823,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 size="sm"
                 onClick={() => handleStopContainer("df" )}
                 disabled={isStoppingContainer}
-                className="flex items-center gap-2 hidden"
+                className=" items-center gap-2 hidden "
               >
                 {isStoppingContainer ? (
                   <Loader className="w-4 h-4 animate-spin" />
