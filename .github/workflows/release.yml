@@ -30,8 +30,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      
+        with:
+          fetch-depth: 0
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -41,9 +41,12 @@ jobs:
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-           sudo apt-get update
-           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
-
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
+          sudo apt-get install -y webkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev
+          sudo apt-get install -y libayatana-appindicator3-dev
+          sudo apt-get install -y libxdo-dev
+          
       - name: Install dependencies (mac only)
         if: matrix.platform == 'macos-latest'
         run: |
@@ -65,7 +68,6 @@ jobs:
           npm install
           npm install -D @tauri-apps/cli
 
-      # Create next.config.js dynamically
       - name: Create Next.js config
         run: |
           echo 'const nextConfig = {
@@ -81,119 +83,30 @@ jobs:
           CI: true
           NODE_ENV: production
 
-      - name: Generate Release Notes (Unix)
-        if: matrix.platform != 'windows-latest'
-        id: release_notes_unix
+      - name: Generate Simple Release Notes
+        id: release_notes
         shell: bash
         run: |
-            # Get all commits since last tag
-            COMMITS=$(git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"%s")
-            
-            # Initialize categories
-            FEATURES=""
-            FIXES=""
-            PERFORMANCE=""
-            
-            # Parse commits and categorize
-            while IFS= read -r commit; do
-              if [[ $commit == feat* ]]; then
-                FEATURES="$FEATURES* ${commit#feat*: }\n"
-              elif [[ $commit == fix* ]]; then
-                FIXES="$FIXES* ${commit#fix*: }\n"
-              elif [[ $commit == perf* ]]; then
-                PERFORMANCE="$PERFORMANCE* ${commit#perf*: }\n"
-              fi
-            done <<< "$COMMITS"
-            
-            # Create release notes
-            echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-            echo "# ${{ github.ref_name }}" >> $GITHUB_ENV
-            echo "\`${{ github.sha }}\`" >> $GITHUB_ENV
-            echo "" >> $GITHUB_ENV
-            
-            if [ ! -z "$FEATURES" ]; then
-              echo "## New Features" >> $GITHUB_ENV
-              echo -e "$FEATURES" >> $GITHUB_ENV
-            fi
-            
-            if [ ! -z "$FIXES" ]; then
-              echo "## Bug Fixes" >> $GITHUB_ENV
-              echo -e "$FIXES" >> $GITHUB_ENV
-            fi
-            
-            if [ ! -z "$PERFORMANCE" ]; then
-              echo "## Performance" >> $GITHUB_ENV
-              echo -e "$PERFORMANCE" >> $GITHUB_ENV
-            fi
-            
-            echo "" >> $GITHUB_ENV
-            echo "## Installation" >> $GITHUB_ENV
-            echo "Download the appropriate version for your operating system:" >> $GITHUB_ENV
-            echo "- Windows: \`.msi\` installer" >> $GITHUB_ENV
-            echo "- macOS: \`.dmg\` installer" >> $GITHUB_ENV
-            echo "- Linux: \`.deb\` package and \`.AppImage\`" >> $GITHUB_ENV
-            echo "" >> $GITHUB_ENV
-            echo "**Full Changelog**: ${{ github.event.repository.html_url }}/compare/${{ github.event.before }}...${{ github.ref_name }}" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-        
-      - name: Generate Release Notes (Windows)
-        if: matrix.platform == 'windows-latest'
-        id: release_notes_windows
-        shell: pwsh
-        run: |
-            $Commits = git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"%s"
-            $Features = ""
-            $Fixes = ""
-            $Performance = ""
-            
-            foreach ($Commit in $($Commits -split "`n")) {
-              if ($Commit -match '^feat.*:') {
-                $Features += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
-              }
-              elseif ($Commit -match '^fix.*:') {
-                $Fixes += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
-              }
-              elseif ($Commit -match '^perf.*:') {
-                $Performance += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
-              }
-            }
-            
-            "RELEASE_NOTES<<EOF" >> $env:GITHUB_ENV
-            "# ${{ github.ref_name }}" >> $env:GITHUB_ENV
-            "`${{ github.sha }}" >> $env:GITHUB_ENV
-            "" >> $env:GITHUB_ENV
-            
-            if ($Features) {
-              "## New Features" >> $env:GITHUB_ENV
-              $Features >> $env:GITHUB_ENV
-            }
-            if ($Fixes) {
-              "## Bug Fixes" >> $env:GITHUB_ENV
-              $Fixes >> $env:GITHUB_ENV
-            }
-            if ($Performance) {
-              "## Performance" >> $env:GITHUB_ENV
-              $Performance >> $env:GITHUB_ENV
-            }
-            
-            "" >> $env:GITHUB_ENV
-            "## Installation" >> $env:GITHUB_ENV
-            "Download the appropriate version for your operating system:" >> $env:GITHUB_ENV
-            "- Windows: `.msi` installer" >> $env:GITHUB_ENV
-            "- macOS: `.dmg` installer" >> $env:GITHUB_ENV
-            "- Linux: `.deb` package and `.AppImage`" >> $env:GITHUB_ENV
-            "" >> $env:GITHUB_ENV
-            "**Full Changelog**: ${{ github.event.repository.html_url }}/compare/${{ github.event.before }}...${{ github.ref_name }}" >> $env:GITHUB_ENV
-            "EOF" >> $env:GITHUB_ENV
+          # Get the version tag
+          VERSION="${{ github.ref_name }}"
+          
+          # Generate simple release notes
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          echo "# Release ${VERSION}" >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          echo "## What's Changed" >> $GITHUB_ENV
+          git log --pretty=format:"* %s" $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              NODE_ENV: production
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
         with:
-              tagName: ${{ github.ref_name }}
-              releaseName: 'Dash Desktop ${{ github.ref_name }}'
-              releaseBody: ${{ env.RELEASE_NOTES }}
-              releaseDraft: false
-              prerelease: false
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Dash Desktop ${{ github.ref_name }}'
+          releaseBody: ${{ env.RELEASE_NOTES }}
+          releaseDraft: false
+          prerelease: false
