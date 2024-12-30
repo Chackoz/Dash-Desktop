@@ -28,46 +28,61 @@ jobs:
       NEXT_TELEMETRY_DISABLED: 1
 
     steps:
+      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Install Rust
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
-      - name: Install dependencies (ubuntu only)
+      # Install dependencies for Ubuntu
+      - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
         run: |
+          sudo add-apt-repository ppa:webkit-team/ppa -y
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
-          sudo apt-get install -y webkit2gtk-4.0-dev build-essential curl wget file libssl-dev
-          sudo apt-get install -y libayatana-appindicator3-dev
-          sudo apt-get install -y libxdo-dev
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            librsvg2-dev \
+            libappindicator3-dev \
+            libayatana-appindicator3-dev \
+            build-essential curl wget file libssl-dev \
+            patchelf libxdo-dev
 
-      - name: Install dependencies (mac only)
+      # Install dependencies for macOS
+      - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
           brew install gtk+3 librsvg
 
+      # Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
+      # Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
+      # Install frontend dependencies
       - name: Install frontend dependencies
         run: |
           npm install
           npm install -D @tauri-apps/cli
 
+      # Create Next.js config
       - name: Create Next.js config
         run: |
           echo 'const nextConfig = {
@@ -77,12 +92,14 @@ jobs:
           };
           module.exports = nextConfig;' > next.config.js
 
+      # Build Next.js
       - name: Build Next.js
         run: npm run build
         env:
           CI: true
           NODE_ENV: production
 
+      # Build Tauri App
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
