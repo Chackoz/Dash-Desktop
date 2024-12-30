@@ -1,0 +1,127 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    
+    env:
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+      NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+      SKIP_PREFLIGHT_CHECK: true
+      NEXT_TELEMETRY_DISABLED: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies (mac only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install gtk+3 webkit2gtk3 libappindicator3 librsvg
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install frontend dependencies
+        run: |
+          npm install
+          npm install -D @tauri-apps/cli
+
+      # Create next.config.js dynamically
+      - name: Create Next.js config
+        run: |
+          echo 'const nextConfig = {
+            output: "export",
+            images: { unoptimized: true },
+            experimental: { appDir: true }
+          };
+          module.exports = nextConfig;' > next.config.js
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          CI: true
+          NODE_ENV: production
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Dash Desktop ${{ github.ref_name }}'
+          releaseBody: |
+            ## Dash Desktop ${{ github.ref_name }}
+            
+            🚀 Latest Release
+            
+            ### Features
+            - Cross-platform desktop application
+            - Real-time Firebase integration
+            - Task management system
+            - Network node status monitoring
+            
+            ### Download Options
+            Choose the appropriate version for your operating system:
+            - Windows: `.msi` installer
+            - macOS: `.dmg` installer
+            - Linux: `.deb` package and `.AppImage`
+            
+            ### System Requirements
+            - Windows 10 or later
+            - macOS 10.15 or later
+            - Ubuntu 20.04 or compatible Linux distribution
+            
+            ### Installation
+            1. Download the appropriate file for your OS
+            2. Run the installer
+            3. Follow the on-screen instructions
+            
+            ### Known Issues
+            - Please report any issues on the GitHub repository
+            
+            ### Support
+            If you encounter any problems, please open an issue on GitHub.
+            
+            ---
+            🔄 Release Date: ${{ github.event.repository.updated_at }}
+            👤 Build Triggered By: ${{ github.actor }}
+          releaseDraft: false
+          prerelease: false
