@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest, archlinux]
+        platform: [macos-latest, windows-latest, archlinux]
     runs-on: ${{ matrix.platform }}
     
     env:
@@ -39,22 +39,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-
-      # Install dependencies for Ubuntu
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev \
-            librsvg2-dev \
-            libappindicator3-dev \
-            libayatana-appindicator3-dev \
-            build-essential curl wget file libssl-dev \
-            patchelf libxdo-dev
 
       # Install dependencies for Arch Linux
       - name: Install dependencies (Arch only)
@@ -142,7 +126,6 @@ jobs:
             ### System Requirements
             - Windows 10 or later
             - macOS 10.15 or later
-            - Ubuntu 20.04 or compatible Linux distribution
             - Arch Linux (latest updates)
             
             ### Installation
