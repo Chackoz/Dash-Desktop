@@ -61,6 +61,7 @@ interface NetworkStats {
     });
   
     useEffect(() => {
+      if (!database) return;
       const presenceRef = ref(database, "presence");
       const messagesRef = ref(database, "messages");
   
@@ -207,6 +208,7 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if(!database) return;
     const messagesRef = ref(database, "messages");
     const handleMessages = (snapshot: DataSnapshot) => {
       const data = snapshot.val() as MessagesData | null;

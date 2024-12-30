@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies (mac only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install gtk+3 webkitgtk libappindicator librsvg
+          brew install gtk+3 webkitgtk librsvg
 
       - name: Setup Node
         uses: actions/setup-node@v4

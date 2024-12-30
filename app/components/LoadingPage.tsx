@@ -39,43 +39,42 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
     const getAndUpdateSpecs = async () => {
       try {
+        if (!auth) {
+          throw new Error("Firebase auth not initialized");
+        }
         setLoadingStage(1);
         await new Promise((resolve) => setTimeout(resolve, 1800)); // Delay for animation
         const user = auth.currentUser;
 
         // Get system specs
         const systemSpecs = await invoke<SystemSpecs>("get_system_specs");
-        systemSpecs.email = user?.email?user.email:"";
+        systemSpecs.email = user?.email ? user.email : "";
         setLoadingStage(2);
 
         // Get clientId from localStorage
         const clientId = localStorage.getItem("clientId");
-
+        if (!database) {
+          return;
+        }
         if (clientId) {
-          const specsRef = ref(
-            database,
-            `users/${clientId}/metadata/system`
-          );
+          const specsRef = ref(database, `users/${clientId}/metadata/system`);
           await update(specsRef, {
             ...systemSpecs,
-         
+
             lastUpdated: new Date().toISOString(),
           });
           setLoadingStage(3);
         } else {
-        
-      
-     
           if (user) {
             const specsRef = ref(database, `users/${user.uid}/metadata/system`);
             localStorage.setItem("clientId", user?.uid);
             await update(specsRef, {
               ...systemSpecs,
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
             });
             setLoadingStage(3);
           }
-        
+
           setLoadingStage(3);
         }
 
@@ -85,7 +84,6 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       } catch (err) {
         setError((err as Error).message);
         console.error("Error getting system specs:", err);
-       
       }
     };
 

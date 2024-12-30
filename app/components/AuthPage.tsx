@@ -43,6 +43,7 @@ export const AuthPage = () => {
 
   const saveUserSpecs = async (userId: string) => {
     const specs = await getSystemSpecs();
+    if (!database) {return;}
     const userSpecsRef = ref(database, `users/${userId}/main/system_specs`);
     await set(userSpecsRef, {
       ...specs,
@@ -56,7 +57,11 @@ export const AuthPage = () => {
     setError('');
 
     try {
+      if (!auth) {
+        throw new Error('Firebase auth not initialized');
+      }
       if (isLogin) {
+      
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);

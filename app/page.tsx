@@ -13,6 +13,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
  
   useEffect(() => {
+    if (!auth) {return;}
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
     });
