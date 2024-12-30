@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest, self-hosted]
+        platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
     
     env:
@@ -40,20 +40,20 @@ jobs:
         with:
           toolchain: stable
 
-      # Install dependencies for Arch Linux
-      - name: Install dependencies (Arch only)
-        if: matrix.platform == 'archlinux'
-        run: |
-          sudo pacman -Syu --noconfirm
-          sudo pacman -S --needed --noconfirm \
-            webkit2gtk \
-            gtk3 \
-            libsoup \
-            libappindicator-gtk3 \
-            librsvg \
-            rustup nodejs npm
-          rustup default stable
-          rustup target add x86_64-unknown-linux-gnu
+      # # Install dependencies for Arch Linux
+      # - name: Install dependencies (Arch only)
+      #   if: matrix.platform == 'archlinux'
+      #   run: |
+      #     sudo pacman -Syu --noconfirm
+      #     sudo pacman -S --needed --noconfirm \
+      #       webkit2gtk \
+      #       gtk3 \
+      #       libsoup \
+      #       libappindicator-gtk3 \
+      #       librsvg \
+      #       rustup nodejs npm
+      #     rustup default stable
+      #     rustup target add x86_64-unknown-linux-gnu
 
       # Install dependencies for macOS
       - name: Install dependencies (macOS only)
