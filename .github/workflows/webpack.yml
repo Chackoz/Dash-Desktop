@@ -1,0 +1,77 @@
+name: Build and Release Tauri App
+
+on:
+  push:
+    branches:
+      - main  # Trigger build on push to main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Choose a base runner (use macos-latest, windows-latest as needed)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: 'stable'
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          
+      - name: Build Tauri App for Windows
+        run: |
+          npm run tauri build --release --target x86_64-pc-windows-msvc
+
+      - name: Build Tauri App for Linux (Arch)
+        run: |
+          npm run tauri build --release --target x86_64-unknown-linux-gnu
+
+      - name: Build Tauri App for Linux (Debian)
+        run: |
+          npm run tauri build --release --target x86_64-unknown-linux-gnu
+
+      - name: Build Tauri App for macOS
+        run: |
+          npm run tauri build --release --target x86_64-apple-darwin
+
+  release:
+    needs: build  # Ensures that the build job runs first
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create GitHub Release
+        id: create_release
+        run: |
+          # Get the version from package.json or use Git tag
+          VERSION=$(node -p "require('./package.json').version")
+          
+          # Create a GitHub release using the `gh` CLI tool
+          gh auth login --with-token < ${{ secrets.GITHUB_TOKEN }}
+          gh release create "v$VERSION" \
+            src-tauri/target/release/bundle/msi/*.msi \
+            src-tauri/target/release/bundle/appimage/*.AppImage \
+            src-tauri/target/release/bundle/deb/*.deb \
+            src-tauri/target/release/bundle/dmg/*.dmg \
+            --title "Release v$VERSION" \
+            --notes "Automated release for v$VERSION"
+
+      - name: Upload Release Assets
+        uses: ncipollo/release-action@v1
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/dmg/*.dmg
