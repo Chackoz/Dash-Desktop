@@ -1,80 +1,48 @@
-name: Build and Release Tauri App
-
+name: Release Tauri App
 on:
   push:
-    branches:
-      - main  # Trigger build on push to the main branch
+    tags:
+      - 'v*' # Trigger on version tags
 
 jobs:
-  build:
-    runs-on: ubuntu-latest  # Base runner (use macos-latest, windows-latest as needed)
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set Git user and email
-        run: |
-          git config --global user.name "Your Name"
-          git config --global user.email "your.email@example.com"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
-        with:
-          rust-version: 'stable'
-
-      - name: Install Dependencies
-        run: |
-          npm install
-          
-      - name: Build Tauri App for Windows
-        run: |
-          npm run tauri build --release --target x86_64-pc-windows-msvc
-
-      - name: Build Tauri App for Linux (Arch)
-        run: |
-          npm run tauri build --release --target x86_64-unknown-linux-gnu
-
-      - name: Build Tauri App for macOS
-        run: |
-          npm run tauri build --release --target x86_64-apple-darwin
-
   release:
-    needs: build  # Ensures that the build job runs first
-    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Create GitHub Release
-        id: create_release
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
         run: |
-          # Get version from package.json or use Git tag
-          VERSION=$(node -p "require('./package.json').version")
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
-          # Authenticate GitHub CLI
-          gh auth login --with-token < ${{ secrets.GITHUB_TOKEN }}
-          
-          # Create the release and upload build files
-          gh release create "v$VERSION" \
-            src-tauri/target/release/bundle/msi/*.msi \
-            src-tauri/target/release/bundle/appimage/*.AppImage \
-            src-tauri/target/release/bundle/deb/*.deb \
-            src-tauri/target/release/bundle/dmg/*.dmg \
-            --title "Release v$VERSION" \
-            --notes "Automated release for v$VERSION"
-      
-      - name: Upload Release Assets
-        uses: ncipollo/release-action@v1
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          files: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/dmg/*.dmg
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'Latest Release of DASH DESKTOP.'
+          releaseDraft: false
+          prerelease: false
