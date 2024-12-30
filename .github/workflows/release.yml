@@ -31,6 +31,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -45,7 +47,7 @@ jobs:
       - name: Install dependencies (mac only)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install gtk+3 webkit2gtk3 libappindicator3 librsvg
+          brew install gtk+3 webkitgtk libappindicator librsvg
 
       - name: Setup Node
         uses: actions/setup-node@v4

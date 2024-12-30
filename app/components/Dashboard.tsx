@@ -125,7 +125,6 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Task Details</DialogTitle>
-          
           </div>
         </DialogHeader>
         <div className="space-y-4">
@@ -178,7 +177,11 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (auth) {
+        await signOut(auth);
+      } else {
+        console.error("Auth is not initialized");
+      }
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -187,140 +190,151 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const { isDarkMode, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const presenceRef = ref(database, "presence");
-    const connectRef = ref(database, ".info/connected");
-    const clientTasksRef = ref(database, "tasks");
+    if (database) {
+      const presenceRef = ref(database, "presence");
+      const connectRef = ref(database, ".info/connected");
+      const clientTasksRef = ref(database, "tasks");
 
-    // Generate or retrieve client ID
-    const storedClientId = localStorage.getItem("clientId");
-    let newClientId: string;
+      // Generate or retrieve client ID
+      const storedClientId = localStorage.getItem("clientId");
+      let newClientId: string;
 
-    if (!storedClientId) {
-      // Generate new client ID only if one doesn't exist
-      const newRef = push(presenceRef);
-      newClientId = newRef.key || "";
-      localStorage.setItem("clientId", newClientId);
-    } else {
-      newClientId = storedClientId;
-    }
+      if (!storedClientId) {
+        // Generate new client ID only if one doesn't exist
+        const newRef = push(presenceRef);
+        newClientId = newRef.key || "";
+        localStorage.setItem("clientId", newClientId);
+      } else {
+        newClientId = storedClientId;
+      }
 
-    setClientId(newClientId);
+      setClientId(newClientId);
 
-    // Set up presence with proper path
-    const setupPresence = () => {
-      if (!newClientId) return; // Guard against empty client ID
+      // Set up presence with proper path
+      const setupPresence = () => {
+        if (!newClientId) return; // Guard against empty client ID
+        if (!database) {
+          return;
+        }
 
-      const clientPresenceRef = ref(database, `presence/${newClientId}`);
-      const presenceData = {
-        status: "idle",
-        lastSeen: new Date().toISOString(),
-        type: "client",
-        userId: user.uid,
-        email: user.email,
+        const clientPresenceRef = ref(database, `presence/${newClientId}`);
+        const presenceData = {
+          status: "idle",
+          lastSeen: new Date().toISOString(),
+          type: "client",
+          userId: user.uid,
+          email: user.email,
+        };
+
+        // Set initial presence
+        set(clientPresenceRef, presenceData);
+
+        // Set up disconnect cleanup
+        onDisconnect(clientPresenceRef).remove();
+
+        // Set up periodic presence updates
+        const presenceInterval = setInterval(() => {
+          update(clientPresenceRef, {
+            lastSeen: new Date().toISOString(),
+          });
+        }, 30000); // Update every 30 seconds
+
+        return () => clearInterval(presenceInterval);
       };
 
-      // Set initial presence
-      set(clientPresenceRef, presenceData);
+      let presenceCleanup: (() => void) | undefined;
 
-      // Set up disconnect cleanup
-      onDisconnect(clientPresenceRef).remove();
+      // Connection handler
+      const handleConnection = (snapshot: DataSnapshot) => {
+        if (snapshot.val()) {
+          presenceCleanup = setupPresence();
+          setNodeStatus("online");
+        } else {
+          if (presenceCleanup) {
+            presenceCleanup();
+          }
+          setNodeStatus("offline");
+        }
+      };
 
-      // Set up periodic presence updates
-      const presenceInterval = setInterval(() => {
-        update(clientPresenceRef, {
-          lastSeen: new Date().toISOString(),
+      // Presence handler with proper filtering
+      const handlePresence = (snapshot: DataSnapshot) => {
+        const presenceData = snapshot.val();
+        if (!presenceData) {
+          setNetworkNodes(0);
+          return;
+        }
+
+        // Only count valid presence entries
+        const activeNodes = Object.entries(presenceData).filter(
+          ([id, data]) => {
+            const presence = data as PresenceData;
+            // Verify the presence entry has required fields and is recent (within last minute)
+            return (
+              id && // Has valid ID
+              presence.lastSeen && // Has lastSeen timestamp
+              presence.status && // Has status
+              presence.type === "client" && // Is a client
+              new Date().getTime() - new Date(presence.lastSeen).getTime() <
+                60000 // Was active in last minute
+            );
+          }
+        ).length;
+
+        setNetworkNodes(activeNodes);
+      };
+      // Tasks handler
+      const handleTasks = async (snapshot: DataSnapshot) => {
+        const tasks = snapshot.val();
+        if (!tasks) return;
+
+        // Process assigned tasks
+        Object.entries(tasks).forEach(async ([taskId, task]) => {
+          const typedTask = task as Task;
+          console.log("Task:", taskId, typedTask);
+          if (
+            typedTask.assignedTo === newClientId &&
+            typedTask.status === "assigned"
+          ) {
+            console.log("Executing assigned task:", taskId);
+            await executeTask(taskId, typedTask);
+          }
         });
-      }, 30000); // Update every 30 seconds
 
-      return () => clearInterval(presenceInterval);
-    };
+        // Update recent tasks
+        const tasksList = Object.entries(tasks)
+          .map(([, data]) => ({
+            ...(data as Task),
+          }))
+          .filter((task) => task.userId === user.uid)
+          .filter((task) => showAllTasks || task.clientId === newClientId)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 10);
 
-    let presenceCleanup: (() => void) | undefined;
+        setRecentTasks(tasksList);
+      };
 
-    // Connection handler
-    const handleConnection = (snapshot: DataSnapshot) => {
-      if (snapshot.val()) {
-        presenceCleanup = setupPresence();
-        setNodeStatus("online");
-      } else {
+      // Set up listeners
+      onValue(connectRef, handleConnection);
+      onValue(presenceRef, handlePresence);
+      onValue(clientTasksRef, handleTasks);
+
+      // Cleanup
+      return () => {
         if (presenceCleanup) {
           presenceCleanup();
         }
-        setNodeStatus("offline");
-      }
-    };
-
-    // Presence handler with proper filtering
-    const handlePresence = (snapshot: DataSnapshot) => {
-      const presenceData = snapshot.val();
-      if (!presenceData) {
-        setNetworkNodes(0);
-        return;
-      }
-
-      // Only count valid presence entries
-      const activeNodes = Object.entries(presenceData).filter(([id, data]) => {
-        const presence = data as PresenceData;
-        // Verify the presence entry has required fields and is recent (within last minute)
-        return (
-          id && // Has valid ID
-          presence.lastSeen && // Has lastSeen timestamp
-          presence.status && // Has status
-          presence.type === "client" && // Is a client
-          new Date().getTime() - new Date(presence.lastSeen).getTime() < 60000 // Was active in last minute
-        );
-      }).length;
-
-      setNetworkNodes(activeNodes);
-    };
-    // Tasks handler
-    const handleTasks = async (snapshot: DataSnapshot) => {
-      const tasks = snapshot.val();
-      if (!tasks) return;
-
-      // Process assigned tasks
-      Object.entries(tasks).forEach(async ([taskId, task]) => {
-        const typedTask = task as Task;
-        console.log("Task:", taskId, typedTask);
-        if (
-          typedTask.assignedTo === newClientId &&
-          typedTask.status === "assigned"
-        ) {
-          console.log("Executing assigned task:", taskId);
-          await executeTask(taskId, typedTask);
-        }
-      });
-
-      // Update recent tasks
-      const tasksList = Object.entries(tasks)
-        .map(([, data]) => ({
-          ...(data as Task),
-        }))
-        .filter((task) => task.userId === user.uid)
-        .filter((task) => showAllTasks || task.clientId === newClientId)
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 10);
-
-      setRecentTasks(tasksList);
-    };
-
-    // Set up listeners
-    onValue(connectRef, handleConnection);
-    onValue(presenceRef, handlePresence);
-    onValue(clientTasksRef, handleTasks);
-
-    // Cleanup
-    return () => {
-      if (presenceCleanup) {
-        presenceCleanup();
-      }
-      off(connectRef);
-      off(presenceRef);
-      off(clientTasksRef);
-    };
+        off(connectRef);
+        off(presenceRef);
+        off(clientTasksRef);
+      };
+      // Rest of your code...
+    } else {
+      console.error("Database is not initialized");
+    }
   }, [showAllTasks, user.uid, user.email]);
 
   // Task handlers
@@ -408,7 +422,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             `CPU: ${cpuLimit}\n` //+
           //  `Time Limit: ${timeLimit}`
         );
-
+        if(!database) {return;}
         // Monitor task status
         const taskRef = ref(database, `tasks/${taskId}`);
         onValue(taskRef, (snapshot) => {
@@ -452,7 +466,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           `Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n` +
             (isDockerMode ? `Docker Image: ${dockerImage}\n` : "")
         );
-
+        if(!database) {return;}
         const taskRef = ref(database, `tasks/${taskId}`);
         onValue(taskRef, (snapshot) => {
           const task = snapshot.val();
@@ -480,6 +494,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     setNodeStatus("busy");
 
     try {
+      if(!database) {return;}
       await update(ref(database, `tasks/${taskId}`), {
         status: "running",
         startedAt: new Date().toISOString(),
@@ -522,6 +537,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
+      if(!database) {return;}
       await update(ref(database, `tasks/${taskId}`), {
         status: "failed",
         output: `Error: ${(error as Error).toString()}`,
@@ -551,7 +567,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         command: dockerCommand ? dockerCommand.split(" ") : [],
         memoryLimit,
         cpuLimit,
-      //  timeLimit
+        //  timeLimit
       });
       setOutput(`Docker Output:\n${result}`);
     } catch (error) {
@@ -564,15 +580,13 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   };
 
   const handleStopContainer = async (taskId?: string) => {
-    
-
     setIsStoppingContainer(true);
     try {
       const result = await invoke<string>("stop_docker_container", {
-        containerId: taskId?taskId:"df",
+        containerId: taskId ? taskId : "df",
       });
       setOutput(`Stop container result: ${result}`);
-
+      if(!database) {return;}
       // Update task status in Firebase if needed
       const taskRef = ref(database, `tasks/${taskId}`);
       await update(taskRef, {
@@ -617,10 +631,6 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
     return null;
   };
-
- 
-
-
 
   const parseDockerCommand = (command: string): string[] => {
     // Handle quoted arguments properly
@@ -696,7 +706,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
               {"Client ID : " + clientId?.replaceAll("-", "")}
             </div>
             <div className="text-sm text-muted-foreground mt-2">
-              {"User ID : " + user.uid  }
+              {"User ID : " + user.uid}
             </div>
           </CardHeader>
         </Card>
@@ -790,25 +800,26 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       <div className="flex-1 flex flex-col">
         <div className="border-b p-4">
           <div className="flex items-center justify-between relative w-full h-8">
-            {!isDockerMode && <div className="flex space-x-4">
-              <Button
-                variant={activeTab === "editor" ? "secondary" : "ghost"}
-                onClick={() => setActiveTab("editor")}
-                className="space-x-2"
-              >
-                <Code2 className="w-4 h-4" />
-                <span>Editor</span>
-              </Button>
-              <Button
-                variant={activeTab === "upload" ? "secondary" : "ghost"}
-                onClick={() => setActiveTab("upload")}
-                className="space-x-2"
-              >
-                <Upload className="w-4 h-4" />
-                <span>Upload</span>
-              </Button>
-            </div>
-}
+            {!isDockerMode && (
+              <div className="flex space-x-4">
+                <Button
+                  variant={activeTab === "editor" ? "secondary" : "ghost"}
+                  onClick={() => setActiveTab("editor")}
+                  className="space-x-2"
+                >
+                  <Code2 className="w-4 h-4" />
+                  <span>Editor</span>
+                </Button>
+                <Button
+                  variant={activeTab === "upload" ? "secondary" : "ghost"}
+                  onClick={() => setActiveTab("upload")}
+                  className="space-x-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Upload</span>
+                </Button>
+              </div>
+            )}
             <div className="flex items-center space-x-2 absolute right-4">
               <Terminal className="w-4 h-4" />
               <span className="text-sm">Docker Mode</span>
@@ -817,22 +828,21 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 onCheckedChange={setIsDockerMode}
               />
             </div>
-          
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleStopContainer("df" )}
-                disabled={isStoppingContainer}
-                className=" items-center gap-2 hidden "
-              >
-                {isStoppingContainer ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : (
-                  <AlertCircle className="w-4 h-4" />
-                )}
-                <span>Stop Container</span>
-              </Button>
-           
+
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleStopContainer("df")}
+              disabled={isStoppingContainer}
+              className=" items-center gap-2 hidden "
+            >
+              {isStoppingContainer ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              <span>Stop Container</span>
+            </Button>
           </div>
         </div>
 

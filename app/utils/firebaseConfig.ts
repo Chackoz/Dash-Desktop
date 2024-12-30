@@ -1,7 +1,7 @@
-import { initializeApp } from "firebase/app";
+import { FirebaseApp, getApps, initializeApp } from "firebase/app";
 //import { getAnalytics } from "firebase/analytics";
-import { getDatabase, push, ref, set, update } from "firebase/database";
-import { getAuth } from 'firebase/auth';
+import { Database, getDatabase, push, ref, set, update } from "firebase/database";
+import { Auth, getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,12 +13,23 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-export const app = initializeApp(firebaseConfig);
-//export const analytics = getAnalytics(app);
-export const database = getDatabase(app);
-export const auth = getAuth(app);
+// Initialize Firebase with safety checks
+let app: FirebaseApp | undefined;
+let database: Database | undefined;
+let auth: Auth | undefined;
 
+if (typeof window !== 'undefined' && !getApps().length) {
+    try {
+        app = initializeApp(firebaseConfig);
+        database = getDatabase(app);
+        auth = getAuth(app);
+    } catch (error) {
+        console.error('Firebase initialization error:', error);
+    }
+}
+
+// Type assertion to maintain compatibility with existing code
+export { app, database, auth };
 
 export interface DockerConfig {
   image: string;
@@ -47,67 +58,75 @@ export interface Task {
   userId?:string;
 }
 
-// Update the createTask function to support both code and Docker tasks
 export async function createTask(
   clientId: string, 
   code: string | null, 
   requirements?: string,
   dockerConfig?: DockerConfig
 ): Promise<string | null> {
+  if (!database) {
+      console.error('Firebase database not initialized');
+      return null;
+  }
+  
   const tasksRef = ref(database, 'tasks');
   const newTaskRef = push(tasksRef);
-  const userId = auth.currentUser?.uid;
+  const userId = auth?.currentUser?.uid;
   const task: Task = {
-    clientId,
-    status: 'pending',
-    output: null,
-    createdAt: new Date().toISOString(),
-    taskType: dockerConfig ? 'docker' : 'code',
-    userId: userId,
+      clientId,
+      status: 'pending',
+      output: null,
+      createdAt: new Date().toISOString(),
+      taskType: dockerConfig ? 'docker' : 'code',
+      userId: userId,
   };
 
   if (code) {
-    task.code = code;
-    task.requirements = requirements;
+      task.code = code;
+      task.requirements = requirements;
   }
 
   if (dockerConfig) {
-    task.dockerConfig = dockerConfig;
+      task.dockerConfig = dockerConfig;
   }
   
   try {
-    await set(newTaskRef, task);
-    return newTaskRef.key;
+      await set(newTaskRef, task);
+      return newTaskRef.key;
   } catch (error) {
-    console.error('Error creating task:', error);
-    return null;
+      console.error('Error creating task:', error);
+      return null;
   }
 }
 
 export type NodeStatus = "idle" | "online" | "offline" | "busy";
 
 export const updateNodeStatus = async (
-    clientId: string,
-    status: NodeStatus
-  ): Promise<void> => {
-   
-    if(clientId === null || clientId === undefined||clientId === "") {
-      throw new Error(`Client ID is required`);
-    }
+  clientId: string,
+  status: NodeStatus
+): Promise<void> => {
+  if (!database) {
+      throw new Error('Firebase database not initialized');
+  }
   
-    const presenceRef = ref(database, `presence/${clientId}`);
-    
-    try {
+  if (clientId === null || clientId === undefined || clientId === "") {
+      throw new Error(`Client ID is required`);
+  }
+
+  const presenceRef = ref(database, `presence/${clientId}`);
+  
+  try {
       await update(presenceRef, {
-        status,
-        lastSeen: new Date().toISOString(),
-        type: "client"
+          status,
+          lastSeen: new Date().toISOString(),
+          type: "client"
       });
-    } catch (error) {
+  } catch (error) {
       console.error("Error updating node status:", error);
       throw new Error(`Failed to update status: ${(error as Error).message}`);
-    }
-  };
+  }
+};
+
 
 
   export interface ChatMessage {
@@ -132,35 +151,44 @@ export const updateNodeStatus = async (
     };
   }
 
-export async function sendChatMessage(senderId: string, senderName: string, content: string): Promise<string | null> {
-  const messagesRef = ref(database, 'messages');
-  const newMessageRef = push(messagesRef);
-  const message: ChatMessage = {
-    senderId,
-    senderName,
-    content,
-    timestamp: new Date().toISOString(),
-    type: 'message'
-  };
+  export async function sendChatMessage(senderId: string, senderName: string, content: string): Promise<string | null> {
+    if (!database) {
+        console.error('Firebase database not initialized');
+        return null;
+    }
   
-  try {
-    await set(newMessageRef, message);
-    return newMessageRef.key;
-  } catch (error) {
-    console.error('Error sending message:', error);
-    return null;
+    const messagesRef = ref(database, 'messages');
+    const newMessageRef = push(messagesRef);
+    const message: ChatMessage = {
+        senderId,
+        senderName,
+        content,
+        timestamp: new Date().toISOString(),
+        type: 'message'
+    };
+    
+    try {
+        await set(newMessageRef, message);
+        return newMessageRef.key;
+    } catch (error) {
+        console.error('Error sending message:', error);
+        return null;
+    }
   }
-}
 
-export async function updateNodeMetadata(nodeId: string, metadata: Partial<NetworkNode['metadata']>): Promise<void> {
-  const nodeRef = ref(database, `presence/${nodeId}`);
-  try {
-    await update(nodeRef, {
-      metadata: metadata,
-      lastSeen: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error updating node metadata:', error);
-    throw error;
-  }
+  export async function updateNodeMetadata(nodeId: string, metadata: Partial<NetworkNode['metadata']>): Promise<void> {
+    if (!database) {
+        throw new Error('Firebase database not initialized');
+    }
+
+    const nodeRef = ref(database, `presence/${nodeId}`);
+    try {
+        await update(nodeRef, {
+            metadata: metadata,
+            lastSeen: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error updating node metadata:', error);
+        throw error;
+    }
 }
