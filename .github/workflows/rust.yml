@@ -1,8 +1,9 @@
-name: Release Tauri App
+name: Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   release:
@@ -42,7 +43,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'Latest Release of DASH DESKTOP.'
+          releaseName: 'Dash Desktop ${{ github.ref_name }}'
+          releaseBody: |
+            ## Dash Desktop ${{ github.ref_name }}
+            
+            ### Download Options
+            Choose the appropriate version for your operating system:
+            - Windows: `.msi` installer
+            - macOS: `.dmg` installer
+            - Linux: `.deb` package and `.AppImage`
+            
+            ### Installation
+            1. Download the appropriate file for your OS
+            2. Run the installer
+            3. Follow the on-screen instructions
+            
+            ### System Requirements
+            - Windows 10/11
+            - macOS 10.15+
+            - Ubuntu 20.04 or compatible Linux distribution
+            
+            ### Support
+            If you encounter any issues, please open an issue on GitHub.
+            
+            ---
+            Release Date: ${{ github.event.repository.updated_at }}
           releaseDraft: false
           prerelease: false
