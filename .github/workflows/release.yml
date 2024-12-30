@@ -81,8 +81,10 @@ jobs:
           CI: true
           NODE_ENV: production
 
-      - name: Generate Release Notes
-        id: release_notes
+      - name: Generate Release Notes (Unix)
+        if: matrix.platform != 'windows-latest'
+        id: release_notes_unix
+        shell: bash
         run: |
             # Get all commits since last tag
             COMMITS=$(git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"%s")
@@ -133,7 +135,56 @@ jobs:
             echo "" >> $GITHUB_ENV
             echo "**Full Changelog**: ${{ github.event.repository.html_url }}/compare/${{ github.event.before }}...${{ github.ref_name }}" >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
-  
+        
+      - name: Generate Release Notes (Windows)
+        if: matrix.platform == 'windows-latest'
+        id: release_notes_windows
+        shell: pwsh
+        run: |
+            $Commits = git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"%s"
+            $Features = ""
+            $Fixes = ""
+            $Performance = ""
+            
+            foreach ($Commit in $($Commits -split "`n")) {
+              if ($Commit -match '^feat.*:') {
+                $Features += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
+              }
+              elseif ($Commit -match '^fix.*:') {
+                $Fixes += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
+              }
+              elseif ($Commit -match '^perf.*:') {
+                $Performance += "* " + $Commit.Substring($Commit.IndexOf(":") + 1).Trim() + "`n"
+              }
+            }
+            
+            "RELEASE_NOTES<<EOF" >> $env:GITHUB_ENV
+            "# ${{ github.ref_name }}" >> $env:GITHUB_ENV
+            "`${{ github.sha }}" >> $env:GITHUB_ENV
+            "" >> $env:GITHUB_ENV
+            
+            if ($Features) {
+              "## New Features" >> $env:GITHUB_ENV
+              $Features >> $env:GITHUB_ENV
+            }
+            if ($Fixes) {
+              "## Bug Fixes" >> $env:GITHUB_ENV
+              $Fixes >> $env:GITHUB_ENV
+            }
+            if ($Performance) {
+              "## Performance" >> $env:GITHUB_ENV
+              $Performance >> $env:GITHUB_ENV
+            }
+            
+            "" >> $env:GITHUB_ENV
+            "## Installation" >> $env:GITHUB_ENV
+            "Download the appropriate version for your operating system:" >> $env:GITHUB_ENV
+            "- Windows: `.msi` installer" >> $env:GITHUB_ENV
+            "- macOS: `.dmg` installer" >> $env:GITHUB_ENV
+            "- Linux: `.deb` package and `.AppImage`" >> $env:GITHUB_ENV
+            "" >> $env:GITHUB_ENV
+            "**Full Changelog**: ${{ github.event.repository.html_url }}/compare/${{ github.event.before }}...${{ github.ref_name }}" >> $env:GITHUB_ENV
+            "EOF" >> $env:GITHUB_ENV
 
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
