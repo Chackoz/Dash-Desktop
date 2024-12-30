@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest, archlinux]
+        platform: [macos-latest, windows-latest, self-hosted]
     runs-on: ${{ matrix.platform }}
     
     env:
