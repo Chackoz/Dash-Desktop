@@ -22,7 +22,7 @@ export default function Home() {
   }, []);
 
   if (loading) {
-    return <LoadingPage onLoadingComplete={() => setLoading(false)} />;
+    return <LoadingPage onLoadingComplete={() => setLoading(false)} currentVersion="1.6.0" />;
   }
 
   if (!user) {

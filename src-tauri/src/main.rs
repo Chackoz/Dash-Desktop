@@ -11,6 +11,10 @@ use std::process::{Command, Stdio};
 use uuid::Uuid;
 use serde::Serialize;
 use sys_info::{cpu_num, cpu_speed, mem_info};
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Serialize)]
 struct SystemSpecs {
@@ -30,6 +34,7 @@ fn start_docker_background() {
     {
         Command::new("cmd")
             .args(["/C", "start /B docker info > NUL 2>&1"])
+            .creation_flags(CREATE_NO_WINDOW)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -47,21 +52,18 @@ fn start_docker_background() {
     }
 }
 
-
-
 fn check_docker() -> bool {
-    let status = Command::new("docker")
-        .arg("--version")
+    let mut cmd = Command::new("docker");
+    cmd.arg("--version")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
+        .stderr(Stdio::null());
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    cmd.status()
         .map(|status| status.success())
-        .unwrap_or(false);
-    
-    if status {
-        start_docker_background();
-    }
-    status
+        .unwrap_or(false)
 }
 
 fn get_version(cmd: &str, args: &[&str]) -> Option<String> {
@@ -114,10 +116,10 @@ fn get_system_specs() -> SystemSpecs {
     }
 }
 
-async fn run_with_docker(
-    code: &str, 
-    requirements: &[String], 
-    container_id: &str
+pub async fn run_with_docker(
+    code: &str,
+    requirements: &[String],
+    container_id: &str,
 ) -> Result<String, String> {
     let temp_dir = tempfile::TempDir::new()
         .map_err(|e| format!("Failed to create temp directory: {}", e))?;
@@ -148,21 +150,29 @@ async fn run_with_docker(
     fs::write(&dockerfile_path, dockerfile)
         .map_err(|e| format!("Failed to write Dockerfile: {}", e))?;
     
-    let build_output = Command::new("docker")
-        .args([
-            "build",
-            "--no-cache",
-            "-t",
-            &format!("python-runner-{}", container_id),
-            temp_dir.path().to_str().unwrap(),
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let mut build_command = Command::new("docker");
+    build_command.args([
+        "build",
+        "--no-cache",
+        "-t",
+        &format!("python-runner-{}", container_id),
+        temp_dir.path().to_str().unwrap(),
+    ])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    build_command.creation_flags(CREATE_NO_WINDOW);
+
+    let build_output = build_command
         .output()
         .map_err(|e| format!("Docker build command failed: {}", e))?;
-
+    
     if !build_output.status.success() {
-        return Err(format!("Docker build failed:\n{}", String::from_utf8_lossy(&build_output.stderr)));
+        return Err(format!(
+            "Docker build failed:\n{}",
+            String::from_utf8_lossy(&build_output.stderr)
+        ));
     }
 
     let run_output = Command::new("docker")
@@ -191,9 +201,15 @@ async fn run_with_docker(
     let stderr = String::from_utf8_lossy(&run_output.stderr).to_string();
     
     if !run_output.status.success() {
-        Err(format!("Container execution failed:\nOutput:\n{}\nErrors:\n{}", stdout, stderr))
+        Err(format!(
+            "Container execution failed:\nOutput:\n{}\nErrors:\n{}",
+            stdout, stderr
+        ))
     } else if !stderr.is_empty() {
-        Ok(format!("Docker Output:\n{}\nWarnings:\n{}", stdout, stderr))
+        Ok(format!(
+            "Docker Output:\n{}\nWarnings:\n{}",
+            stdout, stderr
+        ))
     } else {
         Ok(stdout)
     }

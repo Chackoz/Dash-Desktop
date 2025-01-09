@@ -8,6 +8,7 @@ import {
   RefreshCcw,
   Sun,
   XCircle,
+  ArrowUpCircle,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -39,25 +40,79 @@ interface SystemError {
     | "hardware"
     | "general"
     | "warning"
-    | "destructive";
+    | "destructive"
+    | "update";
   message: string;
   details?: string;
   severity: "critical" | "warning" | "destructive";
   action?: React.ReactNode;
 }
 
+interface GithubRelease {
+  tag_name: string;
+  html_url: string;
+  body: string;
+}
+
 interface LoadingPageProps {
   onLoadingComplete: () => void;
+  currentVersion: string; // Add this prop for version comparison
 }
 
 export const LoadingPage: React.FC<LoadingPageProps> = ({
   onLoadingComplete,
+  currentVersion,
 }) => {
   const { isDarkMode, toggleTheme } = useTheme();
   const [systemErrors, setSystemErrors] = useState<SystemError[]>([]);
   const [loadingStage, setLoadingStage] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [specs, setSpecs] = useState<SystemSpecs | null>(null);
+  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(null);
+
+  const checkForUpdates = async () => {
+    try {
+      const response = await fetch(
+        "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest"
+      );
+      if (!response.ok) throw new Error("Failed to fetch latest release");
+      
+      const release: GithubRelease = await response.json();
+      setLatestVersion(release);
+      console.log("Latest release:", latestVersion);
+
+      // Compare versions (assuming semantic versioning)
+      const current = currentVersion.replace(/[^0-9.]/g, "");
+      const latest = release.tag_name.replace(/[^0-9.]/g, "");
+      
+      if (current < latest) {
+        setSystemErrors(prev => [...prev, {
+          type: "update",
+          severity: "warning",
+          message: "Update Available",
+          details: `A new version (${release.tag_name}) is available. You're currently running version ${currentVersion}.`,
+          action: (
+            <div className="space-y-2">
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full"
+                onClick={() => window.open(release.html_url, "_blank")}
+              >
+                <ArrowUpCircle className="w-4 h-4 mr-2" />
+                Download Update
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                View changelog and download the latest version
+              </p>
+            </div>
+          ),
+        }]);
+      }
+    } catch (error) {
+      console.error("Failed to check for updates:", error);
+    }
+  };
 
   const checkSystemRequirements = async (specs: SystemSpecs) => {
     const errors: SystemError[] = [];
@@ -93,26 +148,26 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         ),
       });
     } else {
-      try {
-        await invoke("run_docker_hub_image", {
-          image: "hello-world",
-          memory_limit: "128m",
-        });
-      } catch (error) {
-        console.log("Docker Desktop error:", error);
-        errors.push({
-          type: "docker",
-          severity: "critical",
-          message: "Docker Desktop is not running",
-          details:
-            "Docker Desktop is installed but not running. Please start Docker Desktop and try again.",
-          action: (
-            <p className="text-sm text-muted-foreground">
-              Start Docker Desktop from your applications menu
-            </p>
-          ),
-        });
-      }
+      // try {
+      //   await invoke("run_docker_hub_image", {
+      //     image: "hello-world",
+      //     memory_limit: "128m",
+      //   });
+      // } catch (error) {
+      //   console.log("Docker Desktop error:", error);
+      //   errors.push({
+      //     type: "docker",
+      //     severity: "critical",
+      //     message: "Docker Desktop is not running",
+      //     details:
+      //       "Docker Desktop is installed but not running. Please start Docker Desktop and try again.",
+      //     action: (
+      //       <p className="text-sm text-muted-foreground">
+      //         Start Docker Desktop from your applications menu
+      //       </p>
+      //     ),
+      //   });
+      // }
     }
 
     return errors;
@@ -154,13 +209,14 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           throw new Error("Firebase auth not initialized");
         }
         setLoadingStage(1);
+        await checkForUpdates(); // Check for updates during initialization
         await new Promise((resolve) => setTimeout(resolve, 1800));
         const user = auth.currentUser;
 
         const systemSpecs = await invoke<SystemSpecs>("get_system_specs");
         setSpecs(systemSpecs);
         const errors = await checkSystemRequirements(systemSpecs);
-        setSystemErrors(errors);
+        setSystemErrors(prev => [...prev, ...errors]);
 
         if (errors.filter((e) => e.severity === "critical").length > 0) {
           return;
@@ -179,6 +235,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           await update(specsRef, {
             ...systemSpecs,
             lastUpdated: new Date().toISOString(),
+            appVersion: currentVersion,
           });
         } else if (user) {
           const specsRef = ref(database, `users/${user.uid}/metadata/system`);
@@ -186,6 +243,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           await update(specsRef, {
             ...systemSpecs,
             lastUpdated: new Date().toISOString(),
+            appVersion: currentVersion,
           });
         }
 
@@ -205,7 +263,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
     };
 
     getAndUpdateSpecs();
-  }, [isDarkMode, toggleTheme, onLoadingComplete]);
+  }, [isDarkMode, toggleTheme, onLoadingComplete, currentVersion]);
 
   const getLoadingText = () => {
     switch (loadingStage) {
@@ -251,7 +309,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         <div className="relative z-10 bg-background/80 backdrop-blur-sm rounded-full p-4">
           {isRetrying ? (
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          ) : systemErrors.length > 0 ? (
+          ) : systemErrors.some(e => e.severity === "critical") ? (
             <XCircle className="w-12 h-12 text-destructive" />
           ) : (
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
@@ -265,9 +323,12 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
             DASH
           </h2>
           <p className="text-sm text-muted-foreground animate-fade-in-up">
-            {systemErrors.length > 0
+            {systemErrors.some(e => e.severity === "critical")
               ? "System Requirements Check"
               : getLoadingText()}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Version {currentVersion}
           </p>
         </div>
 
@@ -299,7 +360,11 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
                   className="text-left"
                 >
                   <AlertTitle className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
+                    {error.type === "update" ? (
+                      <ArrowUpCircle className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
                     {error.message}
                   </AlertTitle>
                   <AlertDescription className="mt-2 space-y-2">

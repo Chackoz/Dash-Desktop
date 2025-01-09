@@ -30,6 +30,7 @@ import {
   FileText,
   LogOut,
   AlertCircle,
+  ArrowUpCircle,
 } from "lucide-react";
 import {
   createTask,
@@ -56,6 +57,12 @@ import NetworkPanel from "./NetworkPanel";
 
 interface DashNetworkProps {
   user: User;
+}
+
+interface GithubRelease {
+  tag_name: string;
+  html_url: string;
+  body: string;
 }
 
 interface PresenceData {
@@ -118,6 +125,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [cpuLimit, setCpuLimit] = useState("1");
   //const [timeLimit, setTimeLimit] = useState("5m");
   const [isStoppingContainer, setIsStoppingContainer] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(null);
+  const [currentVersion, setCurrentVersion] = useState("1.0.0"); // You'll need to pass this as a prop
+  const [hasUpdate, setHasUpdate] = useState(false);
 
   const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
     ({ task }) => (
@@ -188,6 +198,30 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   };
 
   const { isDarkMode, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const response = await fetch(
+          "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest"
+        );
+        if (!response.ok) throw new Error("Failed to fetch latest release");
+        
+        const release: GithubRelease = await response.json();
+        setLatestVersion(release);
+        
+        // Compare versions (assuming semantic versioning)
+        const current = currentVersion.replace(/[^0-9.]/g, "");
+        const latest = release.tag_name.replace(/[^0-9.]/g, "");
+        setCurrentVersion(current);
+        setHasUpdate(current < latest);
+      } catch (error) {
+        console.error("Failed to check for updates:", error);
+      }
+    };
+
+    checkForUpdates();
+  }, [currentVersion]);
 
   useEffect(() => {
     if (database) {
@@ -678,6 +712,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 <CardTitle className="text-lg">DASH</CardTitle>
               </div>
               <div className="flex items-center space-x-2">
+             
                 <Button
                   variant="ghost"
                   size="icon"
@@ -699,6 +734,17 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 </Button>
               </div>
             </div>
+            {hasUpdate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(latestVersion?.html_url, "_blank")}
+                    className="text-primary hover:text-primary-foreground"
+                  >
+                    <ArrowUpCircle className="w-4 h-4 mr-2" />
+                    Update Available
+                  </Button>
+                )}
             <div className="text-sm text-muted-foreground mt-2">
               {user.email}
             </div>
