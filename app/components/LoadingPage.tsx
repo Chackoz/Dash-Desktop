@@ -68,15 +68,17 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
   const [loadingStage, setLoadingStage] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [specs, setSpecs] = useState<SystemSpecs | null>(null);
-  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(null);
+  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(
+    null,
+  );
 
   const checkForUpdates = async () => {
     try {
       const response = await fetch(
-        "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest"
+        "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest",
       );
       if (!response.ok) throw new Error("Failed to fetch latest release");
-      
+
       const release: GithubRelease = await response.json();
       setLatestVersion(release);
       console.log("Latest release:", latestVersion);
@@ -84,30 +86,33 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       // Compare versions (assuming semantic versioning)
       const current = currentVersion.replace(/[^0-9.]/g, "");
       const latest = release.tag_name.replace(/[^0-9.]/g, "");
-      
+
       if (current < latest) {
-        setSystemErrors(prev => [...prev, {
-          type: "update",
-          severity: "warning",
-          message: "Update Available",
-          details: `A new version (${release.tag_name}) is available. You're currently running version ${currentVersion}.`,
-          action: (
-            <div className="space-y-2">
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full"
-                onClick={() => window.open(release.html_url, "_blank")}
-              >
-                <ArrowUpCircle className="w-4 h-4 mr-2" />
-                Download Update
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                View changelog and download the latest version
-              </p>
-            </div>
-          ),
-        }]);
+        setSystemErrors((prev) => [
+          ...prev,
+          {
+            type: "update",
+            severity: "warning",
+            message: "Update Available",
+            details: `A new version (${release.tag_name}) is available. You're currently running version ${currentVersion}.`,
+            action: (
+              <div className="space-y-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => window.open(release.html_url, "_blank")}
+                >
+                  <ArrowUpCircle className="mr-2 h-4 w-4" />
+                  Download Update
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  View changelog and download the latest version
+                </p>
+              </div>
+            ),
+          },
+        ]);
       }
     } catch (error) {
       console.error("Failed to check for updates:", error);
@@ -134,11 +139,11 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
               onClick={() =>
                 window.open(
                   "https://www.docker.com/products/docker-desktop",
-                  "_blank"
+                  "_blank",
                 )
               }
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="mr-2 h-4 w-4" />
               Download Docker Desktop
             </Button>
             <p className="text-xs text-muted-foreground">
@@ -216,7 +221,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         const systemSpecs = await invoke<SystemSpecs>("get_system_specs");
         setSpecs(systemSpecs);
         const errors = await checkSystemRequirements(systemSpecs);
-        setSystemErrors(prev => [...prev, ...errors]);
+        setSystemErrors((prev) => [...prev, ...errors]);
 
         if (errors.filter((e) => e.severity === "critical").length > 0) {
           return;
@@ -281,49 +286,49 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center bg-background overflow-hidden">
+    <div className="flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-background">
       <Button
         variant="ghost"
         size="icon"
         onClick={toggleTheme}
-        className="rounded-full absolute top-4 right-4"
+        className="absolute right-4 top-4 rounded-full"
       >
         {isDarkMode ? (
-          <Sun className="w-4 h-4" />
+          <Sun className="h-4 w-4" />
         ) : (
-          <Moon className="w-4 h-4" />
+          <Moon className="h-4 w-4" />
         )}
       </Button>
 
       <div className="relative">
         <div className="absolute -inset-4 opacity-50">
-          <div className="w-24 h-24 rounded-full bg-primary/10 animate-ping" />
+          <div className="h-24 w-24 animate-ping rounded-full bg-primary/10" />
         </div>
         <div className="absolute -inset-8 opacity-30">
-          <div className="w-32 h-32 rounded-full bg-primary/10 animate-ping animation-delay-150" />
+          <div className="animation-delay-150 h-32 w-32 animate-ping rounded-full bg-primary/10" />
         </div>
         <div className="absolute -inset-12 opacity-20">
-          <div className="w-40 h-40 rounded-full bg-primary/10 animate-ping animation-delay-300" />
+          <div className="animation-delay-300 h-40 w-40 animate-ping rounded-full bg-primary/10" />
         </div>
 
-        <div className="relative z-10 bg-background/80 backdrop-blur-sm rounded-full p-4">
+        <div className="relative z-10 rounded-full bg-background/80 p-4 backdrop-blur-sm">
           {isRetrying ? (
-            <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          ) : systemErrors.some(e => e.severity === "critical") ? (
-            <XCircle className="w-12 h-12 text-destructive" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          ) : systemErrors.some((e) => e.severity === "critical") ? (
+            <XCircle className="h-12 w-12 text-destructive" />
           ) : (
-            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
           )}
         </div>
       </div>
 
-      <div className="mt-8 text-center space-y-6 max-w-md px-4">
+      <div className="mt-8 max-w-md space-y-6 px-4 text-center">
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-primary animate-pulse">
+          <h2 className="animate-pulse text-2xl font-bold text-primary">
             DASH
           </h2>
-          <p className="text-sm text-muted-foreground animate-fade-in-up">
-            {systemErrors.some(e => e.severity === "critical")
+          <p className="animate-fade-in-up text-sm text-muted-foreground">
+            {systemErrors.some((e) => e.severity === "critical")
               ? "System Requirements Check"
               : getLoadingText()}
           </p>
@@ -375,16 +380,16 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
               ))}
 
               {systemErrors.some(
-                (e) => e.type === "docker" || e.type === "python"
+                (e) => e.type === "docker" || e.type === "python",
               ) && (
                 <Button
                   variant="outline"
-                  className="w-full mt-4"
+                  className="mt-4 w-full"
                   onClick={retrySystemChecks}
                   disabled={isRetrying}
                 >
                   <RefreshCcw
-                    className={`w-4 h-4 mr-2 ${
+                    className={`mr-2 h-4 w-4 ${
                       isRetrying ? "animate-spin" : ""
                     }`}
                   />

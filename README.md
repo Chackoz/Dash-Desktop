@@ -1,11 +1,12 @@
-
 # DASH - Distributed Adaptive Serverless Hosting
 
 ## What is DASH?
+
 DASH is a **peer-to-peer distributed system** for executing serverless functions and deploying tasks efficiently. It leverages **Tauri + Nextjs** to create a robust platform where clients can submit code, schedule tasks, and execute them seamlessly across a network of connected nodes.
 DASH redefines task scheduling and execution by introducing an AI-powered [**DASH Scheduler**](https://github.com/Chackoz/Dash-Scheduler) , which dynamically assigns tasks based on node availability and resource utilization.
 
 ## Key Features
+
 - **Peer-to-Peer Execution**: Facilitates distributed execution of serverless functions across multiple nodes.
 - **AI-Based Task Scheduling**: DASH Scheduler intelligently allocates tasks for optimal performance and efficiency.
 - **Real-Time Task Management**: Uses Firebase for instant updates and communication.
@@ -13,8 +14,6 @@ DASH redefines task scheduling and execution by introducing an AI-powered [**DAS
 - **Secure Execution**: Ensures the security and integrity of code and results throughout the pipeline.
 
 ---
-
-
 
 ## Screenshots
 
@@ -24,46 +23,50 @@ DASH redefines task scheduling and execution by introducing an AI-powered [**DAS
 
 ![image](https://github.com/user-attachments/assets/030337eb-99b5-4c32-aa98-2c009affebd6)
 
-
 ## How It Works
 
 ```markdown
-1. # Clients Submit Code/Docker Image: 
+1. # Clients Submit Code/Docker Image:
    - Updated in database with metadata and marked as 'pending.'
-   
-2. # DASH Scheduler: 
+2. # DASH Scheduler:
+
    - The Scheduler listens for pending tasks, evaluates resource availability, and assigns tasks to the most suitable nodes.
 
 3. # Task Execution:
+
    - Idle clients receive task assignments, execute the code, and report the results.
 
 4. # Result Reporting:
+
    - Execution results are fetched and instantly updated for the original client.
 
 5. # Client Notifications:
    - The system notifies clients with detailed results and execution logs.
 ```
----
 
+---
 
 ## Technical Details
 
 ### Frontend
+
 - **Framework**: Tauri + Next.js
 - **Styling**: Tailwind CSS
 - **Tauri API**: Used for secure desktop interactions.
 
 ### Backend
+
 - **Database**: Firebase Realtime Database and Firestore. (for the prototype)
 - **Deployment**: Scheduler is deployed in DASH itself
 
 ### Task Scheduler
+
 - **Language**: Python
 - **Libraries**: Firebase Admin SDK
 - **Task Distribution**: Custom algorithm for dynamic task allocation.
 
-
 ## Contributors
+
 <table>
 <tr>
     <td align="center">
@@ -98,4 +101,5 @@ DASH redefines task scheduling and execution by introducing an AI-powered [**DAS
 </table>
 
 ## License
+
 This project is licensed under the [MIT License](LICENSE).

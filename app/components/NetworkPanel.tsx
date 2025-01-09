@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import React, { useState, useEffect, useRef } from "react";
 import { ref, onValue, off, DataSnapshot } from "firebase/database";
 import {
@@ -39,7 +39,7 @@ interface NetworkStats {
 }
 
 interface PresenceNode {
-  type: 'client' | 'server';
+  type: "client" | "server";
   lastSeen: string;
   status: string;
   userId?: string;
@@ -58,7 +58,7 @@ const NetworkTopology: React.FC = () => {
     totalTasksToday: 0,
     averageLatency: 0,
     tasksLastHour: 0,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   });
 
   useEffect(() => {
@@ -69,14 +69,14 @@ const NetworkTopology: React.FC = () => {
     const handlePresence = (snapshot: DataSnapshot) => {
       const data = snapshot.val() as Record<string, PresenceNode> | null;
       if (data) {
-        const activeUsers = Object.values(data).filter((node) => 
-          node.type === "client"
+        const activeUsers = Object.values(data).filter(
+          (node) => node.type === "client",
         ).length;
 
-        setCurrentStats(prev => ({
+        setCurrentStats((prev) => ({
           ...prev,
           activeUsers,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         }));
       }
     };
@@ -86,24 +86,28 @@ const NetworkTopology: React.FC = () => {
       if (data) {
         const messages = Object.values(data);
         const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
         const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-        const todayTasks = messages.filter((msg) => 
-          new Date(msg.timestamp) >= startOfDay
+        const todayTasks = messages.filter(
+          (msg) => new Date(msg.timestamp) >= startOfDay,
         ).length;
 
-        const recentTasks = messages.filter((msg) => 
-          new Date(msg.timestamp) >= hourAgo
+        const recentTasks = messages.filter(
+          (msg) => new Date(msg.timestamp) >= hourAgo,
         ).length;
 
         const latencies = calculateLatencies(messages);
 
-        setCurrentStats(prev => ({
+        setCurrentStats((prev) => ({
           ...prev,
           totalTasksToday: todayTasks,
           tasksLastHour: recentTasks,
-          averageLatency: latencies
+          averageLatency: latencies,
         }));
       }
     };
@@ -123,9 +127,11 @@ const NetworkTopology: React.FC = () => {
     let count = 0;
 
     for (let i = 1; i < messages.length; i++) {
-      const timeDiff = new Date(messages[i].timestamp).getTime() - 
-                      new Date(messages[i - 1].timestamp).getTime();
-      if (timeDiff < 300000) { // Only count if less than 5 minutes
+      const timeDiff =
+        new Date(messages[i].timestamp).getTime() -
+        new Date(messages[i - 1].timestamp).getTime();
+      if (timeDiff < 300000) {
+        // Only count if less than 5 minutes
         totalTime += timeDiff;
         count++;
       }
@@ -135,52 +141,58 @@ const NetworkTopology: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full">
+    <div className="h-full w-full">
       <div className="grid grid-cols-2 gap-4 p-4">
-        <Card className="hover:shadow-lg transition-shadow flex justify-center items-center">
-          <CardContent className="pt-6 flex justify-center items-center">
+        <Card className="flex items-center justify-center transition-shadow hover:shadow-lg">
+          <CardContent className="flex items-center justify-center pt-6">
             <div className="flex items-center justify-center">
-              <div className="space-y-2 justify-center flex flex-col items-center">
+              <div className="flex flex-col items-center justify-center space-y-2">
                 <div className="flex items-center justify-center space-x-2">
-                  <Users className="w-5 h-5 text-primary" />
+                  <Users className="h-5 w-5 text-primary" />
                   <h3 className="text-sm font-medium">Active Users</h3>
                 </div>
-                <p className="text-2xl font-bold text-center">{currentStats.activeUsers}</p>
+                <p className="text-center text-2xl font-bold">
+                  {currentStats.activeUsers}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="transition-shadow hover:shadow-lg">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-primary" />
+              <Clock className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Average Latency</h3>
             </div>
             <div className="mt-2">
-              <p className="text-2xl font-bold">{currentStats.averageLatency}s</p>
+              <p className="text-2xl font-bold">
+                {currentStats.averageLatency}s
+              </p>
               <p className="text-sm text-muted-foreground">Response Time</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="transition-shadow hover:shadow-lg">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <CheckSquare className="w-5 h-5 text-primary" />
+              <CheckSquare className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Tasks Today</h3>
             </div>
             <div className="mt-2">
-              <p className="text-2xl font-bold">{currentStats.totalTasksToday}</p>
+              <p className="text-2xl font-bold">
+                {currentStats.totalTasksToday}
+              </p>
               <p className="text-sm text-muted-foreground">Total Processed</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="transition-shadow hover:shadow-lg">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Zap className="w-5 h-5 text-primary" />
+              <Zap className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Recent Tasks</h3>
             </div>
             <div className="mt-2">
@@ -202,7 +214,7 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
   useEffect(() => {
     if (!database) return;
     const messagesRef = ref(database, "messages");
-    
+
     const handleMessages = (snapshot: DataSnapshot) => {
       const data = snapshot.val() as MessagesData | null;
       if (data) {
@@ -213,8 +225,8 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
         setMessages(
           messageList.sort(
             (a, b) =>
-              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          )
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+          ),
         );
       }
     };
@@ -242,9 +254,9 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[88vh] max-h-[88vh] justify-between overflow-y-auto my-auto w-full items-center">
+    <div className="my-auto flex h-full max-h-[88vh] min-h-[88vh] w-full flex-col items-center justify-between overflow-y-auto">
       <ScrollArea
-        className="flex-1 p-4 overflow-y-auto w-full"
+        className="w-full flex-1 overflow-y-auto p-4"
         ref={scrollAreaRef}
       >
         <div className="space-y-4">
@@ -256,13 +268,13 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
               }`}
             >
               <div
-                className={`max-w-[70%] p-3 rounded-lg ${
+                className={`max-w-[70%] rounded-lg p-3 ${
                   message.senderId === userId
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
                 }`}
               >
-                <div className="text-xs opacity-70 mb-1">
+                <div className="mb-1 text-xs opacity-70">
                   {message.senderName.replaceAll("-", "@ ")}
                 </div>
                 <div>{message.content}</div>
@@ -271,7 +283,7 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
           ))}
         </div>
       </ScrollArea>
-      <div className="p-4 border-t flex gap-2">
+      <div className="flex gap-2 border-t p-4">
         <Input
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
@@ -279,7 +291,7 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
           onKeyPress={handleKeyPress}
         />
         <Button onClick={handleSendMessage} size="icon">
-          <Send className="w-4 h-4" />
+          <Send className="h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -288,7 +300,7 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
 
 const NetworkPanel: React.FC<NetworkChatProps> = ({ userId, userName }) => {
   return (
-    <Card className="h-full max-h-screen overflow-hidden w-[20vw]">
+    <Card className="h-full max-h-screen w-[20vw] overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle>Network</CardTitle>
       </CardHeader>
@@ -299,21 +311,21 @@ const NetworkPanel: React.FC<NetworkChatProps> = ({ userId, userName }) => {
               value="topology"
               className="data-[state=active]:bg-background"
             >
-              <NetworkIcon className="w-4 h-4 mr-2" />
+              <NetworkIcon className="mr-2 h-4 w-4" />
               Stats
             </TabsTrigger>
             <TabsTrigger
               value="chat"
               className="data-[state=active]:bg-background"
             >
-              <User className="w-4 h-4 mr-2" />
+              <User className="mr-2 h-4 w-4" />
               Chat
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="topology" className="h-full mt-0 overflow-auto">
+          <TabsContent value="topology" className="mt-0 h-full overflow-auto">
             <NetworkTopology />
           </TabsContent>
-          <TabsContent value="chat" className="h-full mt-0 overflow-auto">
+          <TabsContent value="chat" className="mt-0 h-full overflow-auto">
             <NetworkChat userId={userId} userName={userName} />
           </TabsContent>
         </Tabs>

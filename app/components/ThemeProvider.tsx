@@ -1,5 +1,5 @@
-"use client"
-import React, { createContext, useContext, useEffect, useState } from 'react';
+"use client";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -16,15 +16,15 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Force dark mode by default
-    document.documentElement.classList.add('dark');
+    document.documentElement.classList.add("dark");
   }, []);
 
   const toggleTheme = () => {
     setIsDarkMode((prev) => !prev);
     if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     } else {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     }
   };
 

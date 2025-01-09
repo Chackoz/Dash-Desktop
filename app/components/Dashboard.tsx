@@ -93,7 +93,7 @@ const TaskStatus = React.memo<{
 
   return (
     <div className={`flex items-center ${config.color}`}>
-      <Icon className={`w-4 h-4 ${config.animate ? "animate-spin" : ""}`} />
+      <Icon className={`h-4 w-4 ${config.animate ? "animate-spin" : ""}`} />
     </div>
   );
 });
@@ -116,7 +116,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [showAllTasks, setShowAllTasks] = useState(false);
 
   const [currentEditor, setCurrentEditor] = useState<"code" | "requirements">(
-    "code"
+    "code",
   );
   const [isDockerMode, setIsDockerMode] = useState(false);
   const [dockerImage, setDockerImage] = useState("");
@@ -125,13 +125,15 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [cpuLimit, setCpuLimit] = useState("1");
   //const [timeLimit, setTimeLimit] = useState("5m");
   const [isStoppingContainer, setIsStoppingContainer] = useState(false);
-  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(null);
+  const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(
+    null,
+  );
   const [currentVersion, setCurrentVersion] = useState("1.0.0"); // You'll need to pass this as a prop
   const [hasUpdate, setHasUpdate] = useState(false);
 
   const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
     ({ task }) => (
-      <DialogContent className="min-w-[70%] h-fit max-h-[90%]  rounded-3xl overflow-y-auto">
+      <DialogContent className="h-fit max-h-[90%] min-w-[70%] overflow-y-auto rounded-3xl">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Task Details</DialogTitle>
@@ -146,14 +148,14 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           </div>
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Task ID</h3>
-            <code className="block p-2 rounded bg-secondary text-xs">
+            <code className="block rounded bg-secondary p-2 text-xs">
               {task.id ? task.id : task.clientId}
             </code>
           </div>
           {task.output && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium">Output</h3>
-              <pre className="p-2 rounded bg-secondary overflow-x-auto">
+              <pre className="overflow-x-auto rounded bg-secondary p-2">
                 <code className="text-xs">{task.output}</code>
               </pre>
             </div>
@@ -166,21 +168,21 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 theme={githubDark}
                 extensions={[python()]}
                 editable={false}
-                className="text-xs rounded-2xl"
+                className="rounded-2xl text-xs"
               />
             </div>
           )}
           {task.requirements && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium">Requirements</h3>
-              <pre className="p-2 rounded bg-secondary overflow-x-auto">
+              <pre className="overflow-x-auto rounded bg-secondary p-2">
                 <code className="text-xs">{task.requirements}</code>
               </pre>
             </div>
           )}
         </div>
       </DialogContent>
-    )
+    ),
   );
 
   TaskDetails.displayName = "TaskDetails";
@@ -203,13 +205,13 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     const checkForUpdates = async () => {
       try {
         const response = await fetch(
-          "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest"
+          "https://api.github.com/repos/Chackoz/Dash-Desktop/releases/latest",
         );
         if (!response.ok) throw new Error("Failed to fetch latest release");
-        
+
         const release: GithubRelease = await response.json();
         setLatestVersion(release);
-        
+
         // Compare versions (assuming semantic versioning)
         const current = currentVersion.replace(/[^0-9.]/g, "");
         const latest = release.tag_name.replace(/[^0-9.]/g, "");
@@ -312,7 +314,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
               new Date().getTime() - new Date(presence.lastSeen).getTime() <
                 60000 // Was active in last minute
             );
-          }
+          },
         ).length;
 
         setNetworkNodes(activeNodes);
@@ -344,7 +346,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           .filter((task) => showAllTasks || task.clientId === newClientId)
           .sort(
             (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           )
           .slice(0, 10);
 
@@ -387,7 +389,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         requirements,
       });
       setOutput(
-        `Running code locally...\nRequirements:\n${requirements}\n\n` + result
+        `Running code locally...\nRequirements:\n${requirements}\n\n` + result,
       );
     } catch (error) {
       setOutput(`Error: ${(error as Error).toString()}`);
@@ -410,7 +412,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       const validationError = validateDockerConfig(
         dockerImage,
         memoryLimit,
-        cpuLimit
+        cpuLimit,
       );
       if (validationError) {
         setOutput(`Error: ${validationError}`);
@@ -436,10 +438,10 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           clientId,
           null,
           undefined,
-          dockerConfig
+          dockerConfig,
         );
         setOutput(
-          `Docker task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`
+          `Docker task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n`,
         );
 
         if (!taskId) {
@@ -453,10 +455,12 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             `Image: ${dockerImage}\n` +
             `Command: ${commandArgs.join(" ")}\n` +
             `Memory: ${memoryLimit}\n` +
-            `CPU: ${cpuLimit}\n` //+
+            `CPU: ${cpuLimit}\n`, //+
           //  `Time Limit: ${timeLimit}`
         );
-        if(!database) {return;}
+        if (!database) {
+          return;
+        }
         // Monitor task status
         const taskRef = ref(database, `tasks/${taskId}`);
         onValue(taskRef, (snapshot) => {
@@ -481,7 +485,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         });
       } catch (error) {
         setOutput(
-          `Error distributing Docker task: ${(error as Error).message}`
+          `Error distributing Docker task: ${(error as Error).message}`,
         );
       } finally {
         setIsLoading(false);
@@ -498,9 +502,11 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         const taskId = await createTask(clientId, code, requirements);
         setOutput(
           `Task distributed successfully!\nTask ID: ${taskId}\nStatus: Pending\n` +
-            (isDockerMode ? `Docker Image: ${dockerImage}\n` : "")
+            (isDockerMode ? `Docker Image: ${dockerImage}\n` : ""),
         );
-        if(!database) {return;}
+        if (!database) {
+          return;
+        }
         const taskRef = ref(database, `tasks/${taskId}`);
         onValue(taskRef, (snapshot) => {
           const task = snapshot.val();
@@ -508,7 +514,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             setOutput(
               `Task ${taskId}\nStatus: ${task.status}\nWorker: ${
                 task.assignedTo || "Unknown"
-              }\n\n${task.output || ""}`
+              }\n\n${task.output || ""}`,
             );
           }
         });
@@ -528,7 +534,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     setNodeStatus("busy");
 
     try {
-      if(!database) {return;}
+      if (!database) {
+        return;
+      }
       await update(ref(database, `tasks/${taskId}`), {
         status: "running",
         startedAt: new Date().toISOString(),
@@ -554,7 +562,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
           "Memory Limit:",
           task.dockerConfig.memoryLimit,
           "CPU Limit:",
-          task.dockerConfig.cpuLimit
+          task.dockerConfig.cpuLimit,
         );
       } else if (task.code) {
         result = await invoke<string>("run_python_code", {
@@ -571,7 +579,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         completedAt: new Date().toISOString(),
       });
     } catch (error) {
-      if(!database) {return;}
+      if (!database) {
+        return;
+      }
       await update(ref(database, `tasks/${taskId}`), {
         status: "failed",
         output: `Error: ${(error as Error).toString()}`,
@@ -620,7 +630,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         containerId: taskId ? taskId : "df",
       });
       setOutput(`Stop container result: ${result}`);
-      if(!database) {return;}
+      if (!database) {
+        return;
+      }
       // Update task status in Firebase if needed
       const taskRef = ref(database, `tasks/${taskId}`);
       await update(taskRef, {
@@ -641,13 +653,13 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         file.text().then(setCode);
       }
     },
-    []
+    [],
   );
 
   const validateDockerConfig = (
     image: string,
     memoryLimit: string,
-    cpuLimit: string
+    cpuLimit: string,
   ): string | null => {
     if (!image.trim()) {
       return "Docker image is required";
@@ -698,13 +710,13 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         ...task,
         id: task.id,
       })),
-    [recentTasks]
+    [recentTasks],
   );
 
   return (
-    <div className="h-screen bg-background text-foreground flex">
+    <div className="flex h-screen bg-background text-foreground">
       {/* Left Sidebar */}
-      <div className="w-80 border-r flex flex-col">
+      <div className="flex w-80 flex-col border-r">
         <Card className="rounded-none border-0 border-b">
           <CardHeader className="p-4">
             <div className="flex items-center justify-between">
@@ -712,16 +724,15 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                 <CardTitle className="text-lg">DASH</CardTitle>
               </div>
               <div className="flex items-center space-x-2">
-             
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => toggleTheme()}
                 >
                   {isDarkMode ? (
-                    <Sun className="w-4 h-4" />
+                    <Sun className="h-4 w-4" />
                   ) : (
-                    <Moon className="w-4 h-4" />
+                    <Moon className="h-4 w-4" />
                   )}
                 </Button>
                 <Button
@@ -730,47 +741,47 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   onClick={handleLogout}
                   className="text-red-500 hover:text-red-600"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             {hasUpdate && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(latestVersion?.html_url, "_blank")}
-                    className="text-primary hover:text-primary-foreground"
-                  >
-                    <ArrowUpCircle className="w-4 h-4 mr-2" />
-                    Update Available
-                  </Button>
-                )}
-            <div className="text-sm text-muted-foreground mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(latestVersion?.html_url, "_blank")}
+                className="text-primary hover:text-primary-foreground"
+              >
+                <ArrowUpCircle className="mr-2 h-4 w-4" />
+                Update Available
+              </Button>
+            )}
+            <div className="mt-2 text-sm text-muted-foreground">
               {user.email}
             </div>
-            <div className="text-sm text-muted-foreground mt-2">
+            <div className="mt-2 text-sm text-muted-foreground">
               {"Client ID : " + clientId?.replaceAll("-", "")}
             </div>
-            <div className="text-sm text-muted-foreground mt-2">
+            <div className="mt-2 text-sm text-muted-foreground">
               {"User ID : " + user.uid}
             </div>
           </CardHeader>
         </Card>
 
-        <div className="p-4 border-b">
+        <div className="border-b p-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
               <div className="flex items-center space-x-2">
                 <div
-                  className={`w-2 h-2 rounded-full ${
+                  className={`h-2 w-2 rounded-full ${
                     nodeStatus === "online"
                       ? "bg-green-500"
                       : nodeStatus === "offline"
-                      ? "bg-red-500"
-                      : nodeStatus === "idle"
-                      ? "bg-green-500"
-                      : "bg-yellow-500"
+                        ? "bg-red-500"
+                        : nodeStatus === "idle"
+                          ? "bg-green-500"
+                          : "bg-yellow-500"
                   }`}
                 />
                 <span className="text-sm capitalize">{nodeStatus}</span>
@@ -796,18 +807,18 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
         <ScrollArea className="flex-1">
           <div className="p-4">
-            <h3 className="text-sm font-medium mb-3">Recent Tasks</h3>
+            <h3 className="mb-3 text-sm font-medium">Recent Tasks</h3>
             <div className="space-y-2">
               {filteredTasks.map((task) => (
                 <button
                   key={`${task.id}-${task.status}-${task.createdAt}`}
                   onClick={() => setSelectedTask(task)}
-                  className="w-full p-3 rounded bg-secondary/50 hover:bg-secondary text-left transition-colors"
+                  className="w-full rounded bg-secondary/50 p-3 text-left transition-colors hover:bg-secondary"
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <TaskStatus status={task.status} output={task.output} />
-                      <div className="text-md font-mono truncate text-muted-foreground">
+                      <div className="text-md truncate font-mono text-muted-foreground">
                         {`Status: ${task.status}`}
                       </div>
                     </div>
@@ -843,9 +854,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-1 flex-col">
         <div className="border-b p-4">
-          <div className="flex items-center justify-between relative w-full h-8">
+          <div className="relative flex h-8 w-full items-center justify-between">
             {!isDockerMode && (
               <div className="flex space-x-4">
                 <Button
@@ -853,7 +864,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   onClick={() => setActiveTab("editor")}
                   className="space-x-2"
                 >
-                  <Code2 className="w-4 h-4" />
+                  <Code2 className="h-4 w-4" />
                   <span>Editor</span>
                 </Button>
                 <Button
@@ -861,13 +872,13 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   onClick={() => setActiveTab("upload")}
                   className="space-x-2"
                 >
-                  <Upload className="w-4 h-4" />
+                  <Upload className="h-4 w-4" />
                   <span>Upload</span>
                 </Button>
               </div>
             )}
-            <div className="flex items-center space-x-2 absolute right-4">
-              <Terminal className="w-4 h-4" />
+            <div className="absolute right-4 flex items-center space-x-2">
+              <Terminal className="h-4 w-4" />
               <span className="text-sm">Docker Mode</span>
               <Switch
                 checked={isDockerMode}
@@ -880,12 +891,12 @@ export default function DashNetwork({ user }: DashNetworkProps) {
               size="sm"
               onClick={() => handleStopContainer("df")}
               disabled={isStoppingContainer}
-              className=" items-center gap-2 hidden "
+              className="hidden items-center gap-2"
             >
               {isStoppingContainer ? (
-                <Loader className="w-4 h-4 animate-spin" />
+                <Loader className="h-4 w-4 animate-spin" />
               ) : (
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="h-4 w-4" />
               )}
               <span>Stop Container</span>
             </Button>
@@ -893,14 +904,14 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         </div>
 
         <div className="flex-1 p-6">
-          <div className="h-full flex flex-col">
+          <div className="flex h-full flex-col">
             {isDockerMode ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Docker Image</label>
                     <input
-                      className="w-full px-3 py-2 rounded bg-secondary/50"
+                      className="w-full rounded bg-secondary/50 px-3 py-2"
                       placeholder="e.g., python:3.9-slim"
                       value={dockerImage}
                       onChange={(e) => setDockerImage(e.target.value)}
@@ -911,7 +922,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                       Command (optional)
                     </label>
                     <input
-                      className="w-full px-3 py-2 rounded bg-secondary/50"
+                      className="w-full rounded bg-secondary/50 px-3 py-2"
                       placeholder="e.g., python script.py"
                       value={dockerCommand}
                       onChange={(e) => setDockerCommand(e.target.value)}
@@ -922,7 +933,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Memory Limit</label>
                     <input
-                      className="w-full px-3 py-2 rounded bg-secondary/50"
+                      className="w-full rounded bg-secondary/50 px-3 py-2"
                       placeholder="e.g., 512m"
                       value={memoryLimit}
                       onChange={(e) => setMemoryLimit(e.target.value)}
@@ -931,7 +942,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">CPU Limit</label>
                     <input
-                      className="w-full px-3 py-2 rounded bg-secondary/50"
+                      className="w-full rounded bg-secondary/50 px-3 py-2"
                       placeholder="e.g., 1"
                       value={cpuLimit}
                       onChange={(e) => setCpuLimit(e.target.value)}
@@ -961,7 +972,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                     variant="secondary"
                     className="space-x-2"
                   >
-                    <PlayCircle className="w-4 h-4" />
+                    <PlayCircle className="h-4 w-4" />
                     <span>Run Docker Locally</span>
                   </Button>
                   <Button
@@ -971,7 +982,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                     }
                     className="space-x-2"
                   >
-                    <Network className="w-4 h-4" />
+                    <Network className="h-4 w-4" />
                     <span>Distribute Docker</span>
                   </Button>
                 </div>
@@ -987,38 +998,38 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   >
                     <TabsList>
                       <TabsTrigger value="code" className="space-x-2">
-                        <Code2 className="w-4 h-4" />
+                        <Code2 className="h-4 w-4" />
                         <span>Code</span>
                       </TabsTrigger>
                       <TabsTrigger value="requirements" className="space-x-2">
-                        <FileText className="w-4 h-4" />
+                        <FileText className="h-4 w-4" />
                         <span>Requirements</span>
                       </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="code" className="flex-1 mt-4">
+                    <TabsContent value="code" className="mt-4 flex-1">
                       <CodeMirror
                         value={code}
                         theme={githubDark}
                         extensions={[python()]}
                         onChange={setCode}
-                        className="flex-1 rounded-md overflow-hidden"
+                        className="flex-1 overflow-hidden rounded-md"
                         height="400px"
                       />
                     </TabsContent>
-                    <TabsContent value="requirements" className="flex-1 mt-4">
+                    <TabsContent value="requirements" className="mt-4 flex-1">
                       <textarea
                         value={requirements}
                         onChange={(e) => setRequirements(e.target.value)}
-                        className="w-full h-[400px] font-mono text-sm p-4 rounded bg-secondary/50 resize-none focus:outline-none focus:ring-1"
+                        className="h-[400px] w-full resize-none rounded bg-secondary/50 p-4 font-mono text-sm focus:outline-none focus:ring-1"
                         placeholder="# Enter your requirements comma separated&#10;numpy==1.21.0&#10;pandas>=1.3.0&#10;requests"
                       />
                     </TabsContent>
                   </Tabs>
                 ) : (
-                  <div className="flex-1 grid grid-cols-2 gap-4">
-                    <label className="flex-1 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-secondary/50 transition-colors">
+                  <div className="grid flex-1 grid-cols-2 gap-4">
+                    <label className="flex flex-1 cursor-pointer items-center justify-center rounded border-2 border-dashed transition-colors hover:bg-secondary/50">
                       <div className="text-center">
-                        <Code2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        <Code2 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">
                           Upload Python File (.py)
                         </span>
@@ -1030,9 +1041,9 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                         />
                       </div>
                     </label>
-                    <label className="flex-1 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-secondary/50 transition-colors">
+                    <label className="flex flex-1 cursor-pointer items-center justify-center rounded border-2 border-dashed transition-colors hover:bg-secondary/50">
                       <div className="text-center">
-                        <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">
                           Upload Requirements (.txt)
                         </span>
@@ -1052,14 +1063,14 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                   </div>
                 )}
 
-                <div className="flex space-x-4 mt-4">
+                <div className="mt-4 flex space-x-4">
                   <Button
                     onClick={handleRunLocally}
                     disabled={isLoading || !code}
                     variant="secondary"
                     className="space-x-2"
                   >
-                    <PlayCircle className="w-4 h-4" />
+                    <PlayCircle className="h-4 w-4" />
                     <span>Run Locally</span>
                   </Button>
                   <Button
@@ -1067,7 +1078,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
                     disabled={isLoading || !code || nodeStatus === "offline"}
                     className="space-x-2"
                   >
-                    <Network className="w-4 h-4" />
+                    <Network className="h-4 w-4" />
                     <span>Distribute to Network</span>
                   </Button>
                 </div>
@@ -1084,15 +1095,15 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             )}
 
             <div className="mt-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Terminal className="w-4 h-4" />
+              <div className="mb-2 flex items-center space-x-2">
+                <Terminal className="h-4 w-4" />
                 <span className="font-medium">Output</span>
               </div>
               <textarea
                 value={output}
                 readOnly
-                className={`w-full font-mono text-sm p-4 rounded bg-secondary/50 resize-none h-full ${
-                  isDockerMode ? "min-h-[35vh] " : "min-h-[18vh] "
+                className={`h-full w-full resize-none rounded bg-secondary/50 p-4 font-mono text-sm ${
+                  isDockerMode ? "min-h-[35vh]" : "min-h-[18vh]"
                 }focus:outline-none focus:ring-1`}
               />
             </div>
