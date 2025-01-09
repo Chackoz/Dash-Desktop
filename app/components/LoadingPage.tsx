@@ -206,7 +206,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
     const getAndUpdateSpecs = async () => {
       try {
         if (!auth) {
-          throw new Error("Firebase auth not initialized");
+          return;
         }
         setLoadingStage(1);
         await checkForUpdates(); // Check for updates during initialization
