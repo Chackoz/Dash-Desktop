@@ -7,11 +7,10 @@ use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
 use env_logger;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use uuid::Uuid;
 use serde::Serialize;
 use sys_info::{cpu_num, cpu_speed, mem_info};
-
 
 #[derive(Serialize)]
 struct SystemSpecs {
@@ -26,17 +25,50 @@ struct SystemSpecs {
     rust: Option<String>,
 }
 
+fn start_docker_background() {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start /B docker info > NUL 2>&1"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("sh")
+            .args(["-c", "docker info > /dev/null 2>&1 &"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
+    }
+}
+
+
+
 fn check_docker() -> bool {
-    Command::new("docker")
+    let status = Command::new("docker")
         .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    
+    if status {
+        start_docker_background();
+    }
+    status
 }
 
 fn get_version(cmd: &str, args: &[&str]) -> Option<String> {
     Command::new(cmd)
         .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .output()
         .ok()
         .and_then(|output| {
@@ -82,7 +114,6 @@ fn get_system_specs() -> SystemSpecs {
     }
 }
 
-
 async fn run_with_docker(
     code: &str, 
     requirements: &[String], 
@@ -95,7 +126,6 @@ async fn run_with_docker(
     fs::write(&script_path, code)
         .map_err(|e| format!("Failed to write Python script: {}", e))?;
     
-    // Only include pip install if there are requirements
     let dockerfile = if requirements.is_empty() {
         String::from(
             "FROM python:3.9-slim\n\
@@ -118,7 +148,6 @@ async fn run_with_docker(
     fs::write(&dockerfile_path, dockerfile)
         .map_err(|e| format!("Failed to write Dockerfile: {}", e))?;
     
-    // Rest of the function remains the same...
     let build_output = Command::new("docker")
         .args([
             "build",
@@ -127,6 +156,8 @@ async fn run_with_docker(
             &format!("python-runner-{}", container_id),
             temp_dir.path().to_str().unwrap(),
         ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Docker build command failed: {}", e))?;
 
@@ -144,13 +175,16 @@ async fn run_with_docker(
             "--network", "none",
             "--security-opt", "no-new-privileges",
             &format!("python-runner-{}", container_id),
-            
         ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Docker run failed: {}", e))?;
     
     let _ = Command::new("docker")
         .args(["rmi", "-f", &format!("python-runner-{}", container_id)])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .output();
     
     let stdout = String::from_utf8_lossy(&run_output.stdout).to_string();
@@ -172,10 +206,11 @@ async fn run_with_venv(
 ) -> Result<String, String> {
     let venv_path = std::env::temp_dir().join(format!("venv_{}", venv_id));
     
-    // Create virtual environment
     let python_executable = std::env::var("PYTHON_EXECUTABLE").unwrap_or("python".to_string());
     let create_venv = Command::new(&python_executable)
         .args(["-m", "venv", venv_path.to_str().unwrap()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Failed to create virtual environment: {}", e))?;
 
@@ -184,18 +219,18 @@ async fn run_with_venv(
             String::from_utf8_lossy(&create_venv.stderr)));
     }
 
-    // Get venv Python path
     let venv_python = if cfg!(windows) {
         venv_path.join("Scripts").join("python.exe")
     } else {
         venv_path.join("bin").join("python")
     };
 
-    // Install requirements if any
     if !requirements.is_empty() {
         let mut install_cmd = Command::new(&venv_python);
         install_cmd.args(["-m", "pip", "install"]);
         install_cmd.args(requirements);
+        install_cmd.stdout(Stdio::null());
+        install_cmd.stderr(Stdio::piped());
         
         let install_output = install_cmd
             .output()
@@ -208,7 +243,6 @@ async fn run_with_venv(
         }
     }
 
-    // Create temporary file for the code
     let mut temp_file = NamedTempFile::new()
         .map_err(|e| format!("Failed to create temp file: {}", e))?;
     
@@ -217,13 +251,13 @@ async fn run_with_venv(
 
     let temp_path = temp_file.into_temp_path();
 
-    // Run the Python code
     let output = Command::new(&venv_python)
         .arg(temp_path.to_str().unwrap())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Failed to execute Python: {}", e))?;
 
-    // Cleanup
     let _ = fs::remove_dir_all(&venv_path);
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -244,7 +278,6 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
 
     let run_id = Uuid::new_v4().to_string();
     
-    // Parse requirements
     let requirements: Vec<String> = requirements
         .unwrap_or_default()
         .split(',')
@@ -252,17 +285,7 @@ async fn run_python_code(code: String, requirements: Option<String>) -> Result<S
         .filter(|s| !s.is_empty())
         .collect();
 
-    // match run_with_docker(&code, &requirements, &run_id).await {
-    //     Ok(output) => Ok(format!("[Docker Execution]\n{}", output)),
-    //     Err(e) => {
-    //         match run_with_venv(&code, &requirements, &run_id).await {
-    //             Ok(output) => Ok(format!("[Venv Execution]\n{}", output)),
-    //             Err(e) => Err(format!("Docker failed, then venv failed:\n{}", e))
-    //         }
-    //     }
-    // }
     run_with_docker(&code, &requirements, &run_id).await
-    
 }
 
 #[tauri::command]
@@ -278,6 +301,8 @@ async fn run_docker_hub_image(
     
     let pull_output = Command::new("docker")
         .args(["pull", &image])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Failed to pull Docker image: {}", e))?;
 
@@ -315,10 +340,11 @@ async fn run_docker_hub_image(
     if let Some(cmd) = command {
         run_args.extend(cmd);
     }
-  
 
     let run_output = Command::new("docker")
         .args(&run_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Docker run failed: {}", e))?;
 
@@ -336,7 +362,6 @@ async fn run_docker_hub_image(
 
 #[tauri::command]
 async fn stop_docker_container(id: String) -> Result<String, String> {
-    
     let stop_output = Command::new("docker")
         .args([
             "ps",
@@ -344,6 +369,8 @@ async fn stop_docker_container(id: String) -> Result<String, String> {
             "--filter",
             "name=hub-runner-default",
         ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .output()
         .map_err(|e| format!("Failed to list containers: {}", e))?;
 
@@ -356,6 +383,8 @@ async fn stop_docker_container(id: String) -> Result<String, String> {
     for id in container_ids.split_whitespace() {
         let stop_result = Command::new("docker")
             .args(["stop", id])
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
             .output()
             .map_err(|e| format!("Failed to stop container: {}", e))?;
 
@@ -383,4 +412,4 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-        }
+}

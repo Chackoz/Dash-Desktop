@@ -1,8 +1,19 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Loader2, Moon, Sun } from "lucide-react";
+import {
+  AlertCircle,
+  Download,
+  Loader2,
+  Moon,
+  RefreshCcw,
+  Sun,
+  XCircle,
+} from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { invoke } from "@tauri-apps/api/core";
 import { auth, database } from "@/app/utils/firebaseConfig";
 import { ref, update } from "firebase/database";
@@ -21,6 +32,20 @@ interface SystemSpecs {
   displayName?: string;
 }
 
+interface SystemError {
+  type:
+    | "docker"
+    | "python"
+    | "hardware"
+    | "general"
+    | "warning"
+    | "destructive";
+  message: string;
+  details?: string;
+  severity: "critical" | "warning" | "destructive";
+  action?: React.ReactNode;
+}
+
 interface LoadingPageProps {
   onLoadingComplete: () => void;
 }
@@ -29,8 +54,94 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
   onLoadingComplete,
 }) => {
   const { isDarkMode, toggleTheme } = useTheme();
-  const [error, setError] = useState<string | null>(null);
+  const [systemErrors, setSystemErrors] = useState<SystemError[]>([]);
   const [loadingStage, setLoadingStage] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [specs, setSpecs] = useState<SystemSpecs | null>(null);
+
+  const checkSystemRequirements = async (specs: SystemSpecs) => {
+    const errors: SystemError[] = [];
+
+    // Check Docker
+    if (!specs.docker) {
+      errors.push({
+        type: "docker",
+        severity: "critical",
+        message: "Docker Desktop is not installed",
+        details:
+          "Docker Desktop is required to run containerized applications. Please install it and restart your system.",
+        action: (
+          <div className="space-y-2">
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full"
+              onClick={() =>
+                window.open(
+                  "https://www.docker.com/products/docker-desktop",
+                  "_blank"
+                )
+              }
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download Docker Desktop
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              After installation, restart your system and try again
+            </p>
+          </div>
+        ),
+      });
+    } else {
+      try {
+        await invoke("run_docker_hub_image", {
+          image: "hello-world",
+          memory_limit: "128m",
+        });
+      } catch (error) {
+        console.log("Docker Desktop error:", error);
+        errors.push({
+          type: "docker",
+          severity: "critical",
+          message: "Docker Desktop is not running",
+          details:
+            "Docker Desktop is installed but not running. Please start Docker Desktop and try again.",
+          action: (
+            <p className="text-sm text-muted-foreground">
+              Start Docker Desktop from your applications menu
+            </p>
+          ),
+        });
+      }
+    }
+
+    return errors;
+  };
+
+  const retrySystemChecks = async () => {
+    setIsRetrying(true);
+    try {
+      const specs = await invoke<SystemSpecs>("get_system_specs");
+      setSpecs(specs);
+      const errors = await checkSystemRequirements(specs);
+      setSystemErrors(errors);
+      if (errors.filter((e) => e.severity === "critical").length === 0) {
+        onLoadingComplete();
+      }
+    } catch (err) {
+      console.log(specs);
+      setSystemErrors([
+        {
+          type: "general",
+          severity: "critical",
+          message: "System Check Failed",
+          details: (err as Error).message,
+        },
+      ]);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   useEffect(() => {
     if (!isDarkMode) {
@@ -43,47 +154,53 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
           throw new Error("Firebase auth not initialized");
         }
         setLoadingStage(1);
-        await new Promise((resolve) => setTimeout(resolve, 1800)); // Delay for animation
+        await new Promise((resolve) => setTimeout(resolve, 1800));
         const user = auth.currentUser;
 
-        // Get system specs
         const systemSpecs = await invoke<SystemSpecs>("get_system_specs");
+        setSpecs(systemSpecs);
+        const errors = await checkSystemRequirements(systemSpecs);
+        setSystemErrors(errors);
+
+        if (errors.filter((e) => e.severity === "critical").length > 0) {
+          return;
+        }
+
         systemSpecs.email = user?.email ? user.email : "";
         setLoadingStage(2);
 
-        // Get clientId from localStorage
         const clientId = localStorage.getItem("clientId");
         if (!database) {
           return;
         }
+
         if (clientId) {
           const specsRef = ref(database, `users/${clientId}/metadata/system`);
           await update(specsRef, {
             ...systemSpecs,
-
             lastUpdated: new Date().toISOString(),
           });
-          setLoadingStage(3);
-        } else {
-          if (user) {
-            const specsRef = ref(database, `users/${user.uid}/metadata/system`);
-            localStorage.setItem("clientId", user?.uid);
-            await update(specsRef, {
-              ...systemSpecs,
-              lastUpdated: new Date().toISOString(),
-            });
-            setLoadingStage(3);
-          }
-
-          setLoadingStage(3);
+        } else if (user) {
+          const specsRef = ref(database, `users/${user.uid}/metadata/system`);
+          localStorage.setItem("clientId", user.uid);
+          await update(specsRef, {
+            ...systemSpecs,
+            lastUpdated: new Date().toISOString(),
+          });
         }
 
-        // Add small delay before completing loading
+        setLoadingStage(3);
         await new Promise((resolve) => setTimeout(resolve, 500));
         onLoadingComplete();
       } catch (err) {
-        setError((err as Error).message);
-        console.error("Error getting system specs:", err);
+        setSystemErrors([
+          {
+            type: "general",
+            severity: "critical",
+            message: "System Check Failed",
+            details: (err as Error).message,
+          },
+        ]);
       }
     };
 
@@ -132,24 +249,85 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         </div>
 
         <div className="relative z-10 bg-background/80 backdrop-blur-sm rounded-full p-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          {isRetrying ? (
+            <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          ) : systemErrors.length > 0 ? (
+            <XCircle className="w-12 h-12 text-destructive" />
+          ) : (
+            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          )}
         </div>
       </div>
 
-      <div className="mt-8 text-center space-y-6">
+      <div className="mt-8 text-center space-y-6 max-w-md px-4">
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-primary animate-pulse">
             DASH
           </h2>
           <p className="text-sm text-muted-foreground animate-fade-in-up">
-            {getLoadingText()}
+            {systemErrors.length > 0
+              ? "System Requirements Check"
+              : getLoadingText()}
           </p>
         </div>
 
-        {error && (
-          <p className="text-sm text-destructive bg-destructive/10 px-4 py-2 rounded-lg">
-            Error: {error}
-          </p>
+        {systemErrors.length > 0 && (
+          <Card className="bg-background/50 backdrop-blur-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">System Requirements</CardTitle>
+                <Badge
+                  variant={
+                    systemErrors.some((e) => e.severity === "critical")
+                      ? "destructive"
+                      : "default"
+                  }
+                >
+                  {systemErrors.some((e) => e.severity === "critical")
+                    ? "Action Required"
+                    : "Warning"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {systemErrors.map((error, index) => (
+                <Alert
+                  key={index}
+                  variant={
+                    error.severity === "critical" ? "destructive" : "default"
+                  }
+                  className="text-left"
+                >
+                  <AlertTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {error.message}
+                  </AlertTitle>
+                  <AlertDescription className="mt-2 space-y-2">
+                    <p className="text-sm">{error.details}</p>
+                    {error.action}
+                  </AlertDescription>
+                </Alert>
+              ))}
+
+              {systemErrors.some(
+                (e) => e.type === "docker" || e.type === "python"
+              ) && (
+                <Button
+                  variant="outline"
+                  className="w-full mt-4"
+                  onClick={retrySystemChecks}
+                  disabled={isRetrying}
+                >
+                  <RefreshCcw
+                    className={`w-4 h-4 mr-2 ${
+                      isRetrying ? "animate-spin" : ""
+                    }`}
+                  />
+                  Check Requirements Again
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 

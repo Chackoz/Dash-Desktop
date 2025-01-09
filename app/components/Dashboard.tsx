@@ -1057,8 +1057,8 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       {/* Right Panel */}
       <div className="col-span-1 h-full">
         <NetworkPanel
-          userId={clientId}
-          userName={user.displayName || clientId}
+          userId={user.uid}
+          userName={user.displayName || user.uid}
         />
       </div>
 
