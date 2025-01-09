@@ -2,18 +2,21 @@
 # DASH - Distributed Adaptive Serverless Hosting
 
 ## What is DASH?
-DASH is a distributed code execution and deployment system designed using **React**, **Firebase**, and **Tauri APIs**. It allows clients to submit code, schedule tasks, and execute them efficiently through connected nodes. DASH focuses on simplifying task scheduling and automating code execution workflows.
+DASH is a **peer-to-peer distributed system** for executing serverless functions and deploying tasks efficiently. It leverages **Tauri + Nextjs** to create a robust platform where clients can submit code, schedule tasks, and execute them seamlessly across a network of connected nodes.
+DASH redefines task scheduling and execution by introducing an AI-powered [**DASH Scheduler**](https://github.com/Chackoz/Dash-Scheduler) , which dynamically assigns tasks based on node availability and resource utilization.
 
-## Features
-- **Task Scheduling**: Assigns pending tasks to idle clients automatically.
-- **Distributed Execution**: Executes tasks in parallel across connected nodes.
-- **Real-time Updates**: Uses Firebase for real-time communication and task updates.
-- **Secure Code Handling**: Ensures code integrity and security throughout the execution pipeline.
-- **Scalability**: Easily scalable with multiple connected nodes.
+## Key Features
+- **Peer-to-Peer Execution**: Facilitates distributed execution of serverless functions across multiple nodes.
+- **AI-Based Task Scheduling**: DASH Scheduler intelligently allocates tasks for optimal performance and efficiency.
+- **Real-Time Task Management**: Uses Firebase for instant updates and communication.
+- **Scalable and Flexible**: Easily scales with the addition of new nodes.
+- **Secure Execution**: Ensures the security and integrity of code and results throughout the pipeline.
 
-# Screenshots
+---
 
 
+
+## Screenshots
 
 ![image](https://github.com/user-attachments/assets/1c0f25e2-1441-4011-8639-96c70539330f)
 
@@ -22,45 +25,43 @@ DASH is a distributed code execution and deployment system designed using **Reac
 ![image](https://github.com/user-attachments/assets/030337eb-99b5-4c32-aa98-2c009affebd6)
 
 
+## How It Works
 
-## Architecture
+```markdown
+1. # Clients Submit Code/Docker Image: 
+   - Updated in database with metadata and marked as 'pending.'
+   
+2. # DASH Scheduler: 
+   - The Scheduler listens for pending tasks, evaluates resource availability, and assigns tasks to the most suitable nodes.
+
+3. # Task Execution:
+   - Idle clients receive task assignments, execute the code, and report the results.
+
+4. # Result Reporting:
+   - Execution results are fetched and instantly updated for the original client.
+
+5. # Client Notifications:
+   - The system notifies clients with detailed results and execution logs.
 ```
-1. Clients Submit Code: 
-   - Code is submitted via Firebase with a 'pending' status.
+---
 
-2. Scheduler Monitors Tasks: 
-   - Listens for pending tasks and assigns them to idle clients.
-
-3. Clients Execute Tasks: 
-   - Idle clients listen for assignments, execute code, and report results.
-
-4. Result Reporting:
-   - Execution results are updated in Firebase.
-
-5. Notifications:
-   - Original clients are notified of the results.
-```
 
 ## Technical Details
+
 ### Frontend
 - **Framework**: Tauri + Next.js
 - **Styling**: Tailwind CSS
 - **Tauri API**: Used for secure desktop interactions.
 
 ### Backend
-- **Database**: Firebase Realtime Database and Firestore.
-- **Deployment**: Scheduler in Cloud Functions
+- **Database**: Firebase Realtime Database and Firestore. (for the prototype)
+- **Deployment**: Scheduler is deployed in DASH itself
 
 ### Task Scheduler
 - **Language**: Python
 - **Libraries**: Firebase Admin SDK
 - **Task Distribution**: Custom algorithm for dynamic task allocation.
 
-## How It Works
-1. **Initialize Dash** - Connect the app.
-2. **Submit Code** - Clients upload code with metadata to Firebase.
-3. **Scheduler Assignment** - Scheduler assigns pending tasks to idle clients.
-4. **Execution & Reporting** - Clients execute the assigned code and update the results.
 
 ## Contributors
 <table>
