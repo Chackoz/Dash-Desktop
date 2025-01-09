@@ -11,6 +11,7 @@ use std::process::{Command, Stdio};
 use uuid::Uuid;
 use serde::Serialize;
 use sys_info::{cpu_num, cpu_speed, mem_info};
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
 #[cfg(target_os = "windows")]
