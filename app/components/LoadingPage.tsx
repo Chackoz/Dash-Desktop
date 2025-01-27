@@ -56,7 +56,7 @@ interface GithubRelease {
 
 interface LoadingPageProps {
   onLoadingComplete: () => void;
-  currentVersion: string; // Add this prop for version comparison
+  currentVersion: string; 
 }
 
 export const LoadingPage: React.FC<LoadingPageProps> = ({

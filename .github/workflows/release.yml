@@ -90,6 +90,21 @@ jobs:
           };
           module.exports = nextConfig;' > next.config.js
 
+      # Add environment validation step
+      - name: Validate environment variables
+        run: |
+          echo "Checking Firebase configuration..."
+          if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ]; then
+            echo "Error: FIREBASE_API_KEY is not set"
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" ]; then
+            echo "Error: FIREBASE_AUTH_DOMAIN is not set"
+            exit 1
+          fi
+          # Add checks for other required variables...
+          echo "Firebase configuration validated successfully"
+
       # Build Next.js
       - name: Build Next.js
         run: npm run build

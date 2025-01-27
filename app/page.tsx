@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { LoadingPage } from "./components/LoadingPage";
 import { AuthPage } from "./components/AuthPage";
 import DashNetwork from "./components/Dashboard";
+import { currentDASHVersion } from "./data/data";
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function Home() {
     return (
       <LoadingPage
         onLoadingComplete={() => setLoading(false)}
-        currentVersion="1.8.3"
+        currentVersion={currentDASHVersion}
       />
     );
   }

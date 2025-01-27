@@ -31,6 +31,7 @@ import {
   LogOut,
   AlertCircle,
   ArrowUpCircle,
+  Wallet,
 } from "lucide-react";
 import {
   createTask,
@@ -54,6 +55,20 @@ import { python } from "@codemirror/lang-python";
 import { githubDark } from "@uiw/codemirror-theme-github";
 import { useTheme } from "./ThemeProvider";
 import NetworkPanel from "./NetworkPanel";
+import { currentDASHVersion } from "../data/data";
+
+
+
+// Add type declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string }) => Promise<string[]>;
+      on: (event: string, handler: (accounts: string[]) => void) => void;
+    };
+  }
+}
+
 
 interface DashNetworkProps {
   user: User;
@@ -65,12 +80,25 @@ interface GithubRelease {
   body: string;
 }
 
+interface SystemMetadata {
+  os: string;
+  cpu: string;
+  ram: string;
+  gpu?: string;
+  gpuVram?: string;
+  docker: boolean;
+  python?: string;
+  node?: string;
+  rust?: string;
+}
+
 interface PresenceData {
   status: "idle" | "online" | "offline" | "busy";
   lastSeen: string;
   type: "client" | "worker";
-  email?: string;
+  email: string;
   userId?: string;
+  systemMetadata?: SystemMetadata;
 }
 
 const TaskStatus = React.memo<{
@@ -128,7 +156,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(
     null,
   );
-  const [currentVersion, setCurrentVersion] = useState("1.0.0"); // You'll need to pass this as a prop
+  const [currentVersion, setCurrentVersion] = useState(currentDASHVersion);
   const [hasUpdate, setHasUpdate] = useState(false);
 
   const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
@@ -225,153 +253,157 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     checkForUpdates();
   }, [currentVersion]);
 
-  useEffect(() => {
-    if (database) {
-      const presenceRef = ref(database, "presence");
-      const connectRef = ref(database, ".info/connected");
-      const clientTasksRef = ref(database, "tasks");
 
-      // Generate or retrieve client ID
-      const storedClientId = localStorage.getItem("clientId");
-      let newClientId: string;
 
-      if (!storedClientId) {
-        // Generate new client ID only if one doesn't exist
-        const newRef = push(presenceRef);
-        newClientId = newRef.key || "";
-        localStorage.setItem("clientId", newClientId);
-      } else {
-        newClientId = storedClientId;
-      }
+  // Update the useEffect for presence
+useEffect(() => {
+  if (database) {
+    const presenceRef = ref(database, "presence");
+    const connectRef = ref(database, ".info/connected");
+    const clientTasksRef = ref(database, "tasks");
 
-      setClientId(newClientId);
+    // Generate or retrieve client ID
+    const storedClientId = localStorage.getItem("clientId");
+    let newClientId: string;
 
-      // Set up presence with proper path
-      const setupPresence = () => {
-        if (!newClientId) return; // Guard against empty client ID
-        if (!database) {
-          return;
-        }
+    if (!storedClientId) {
+      const newRef = push(presenceRef);
+      newClientId = newRef.key || "";
+      localStorage.setItem("clientId", newClientId);
+    } else {
+      newClientId = storedClientId;
+    }
 
-        const clientPresenceRef = ref(database, `presence/${newClientId}`);
-        const presenceData = {
-          status: "idle",
+    setClientId(newClientId);
+
+    // Set up presence with proper path
+    const setupPresence = async () => {
+      if (!newClientId) return;
+      if (!database) return;
+
+      const clientPresenceRef = ref(database, `presence/${newClientId}`);
+      
+      // Get system metadata
+      const systemMetadata = await invoke<SystemMetadata>("get_system_specs");
+
+      const presenceData: PresenceData = {
+        status: "idle",
+        lastSeen: new Date().toISOString(),
+        type: "client",
+        userId: user.uid,
+        email: user.email||"",
+        systemMetadata
+      };
+
+      // Set initial presence
+      set(clientPresenceRef, presenceData);
+
+      // Set up disconnect cleanup
+      onDisconnect(clientPresenceRef).remove();
+
+      // Set up periodic presence updates
+      const presenceInterval = setInterval(() => {
+        update(clientPresenceRef, {
           lastSeen: new Date().toISOString(),
-          type: "client",
-          userId: user.uid,
-          email: user.email,
-        };
-
-        // Set initial presence
-        set(clientPresenceRef, presenceData);
-
-        // Set up disconnect cleanup
-        onDisconnect(clientPresenceRef).remove();
-
-        // Set up periodic presence updates
-        const presenceInterval = setInterval(() => {
-          update(clientPresenceRef, {
-            lastSeen: new Date().toISOString(),
-          });
-        }, 30000); // Update every 30 seconds
-
-        return () => clearInterval(presenceInterval);
-      };
-
-      let presenceCleanup: (() => void) | undefined;
-
-      // Connection handler
-      const handleConnection = (snapshot: DataSnapshot) => {
-        if (snapshot.val()) {
-          presenceCleanup = setupPresence();
-          setNodeStatus("online");
-        } else {
-          if (presenceCleanup) {
-            presenceCleanup();
-          }
-          setNodeStatus("offline");
-        }
-      };
-
-      // Presence handler with proper filtering
-      const handlePresence = (snapshot: DataSnapshot) => {
-        const presenceData = snapshot.val();
-        if (!presenceData) {
-          setNetworkNodes(0);
-          return;
-        }
-
-        // Only count valid presence entries
-        const activeNodes = Object.entries(presenceData).filter(
-          ([id, data]) => {
-            const presence = data as PresenceData;
-            // Verify the presence entry has required fields and is recent (within last minute)
-            return (
-              id && // Has valid ID
-              presence.lastSeen && // Has lastSeen timestamp
-              presence.status && // Has status
-              presence.type === "client" && // Is a client
-              new Date().getTime() - new Date(presence.lastSeen).getTime() <
-                60000 // Was active in last minute
-            );
-          },
-        ).length;
-
-        setNetworkNodes(activeNodes);
-      };
-      // Tasks handler
-      const handleTasks = async (snapshot: DataSnapshot) => {
-        const tasks = snapshot.val();
-        if (!tasks) return;
-
-        // Process assigned tasks
-        Object.entries(tasks).forEach(async ([taskId, task]) => {
-          const typedTask = task as Task;
-          console.log("Task:", taskId, typedTask);
-          if (
-            typedTask.assignedTo === newClientId &&
-            typedTask.status === "assigned"
-          ) {
-            console.log("Executing assigned task:", taskId);
-            await executeTask(taskId, typedTask);
-          }
         });
+      }, 30000); // Update every 30 seconds
 
-        // Update recent tasks
-        const tasksList = Object.entries(tasks)
-          .map(([, data]) => ({
-            ...(data as Task),
-          }))
-          .filter((task) => task.userId === user.uid)
-          .filter((task) => showAllTasks || task.clientId === newClientId)
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-          )
-          .slice(0, 10);
+      return () => clearInterval(presenceInterval);
+    };
 
-        setRecentTasks(tasksList);
-      };
+    let presenceCleanup: (() => void) | undefined;
 
-      // Set up listeners
-      onValue(connectRef, handleConnection);
-      onValue(presenceRef, handlePresence);
-      onValue(clientTasksRef, handleTasks);
-
-      // Cleanup
-      return () => {
+    // Connection handler
+    const handleConnection = async (snapshot: DataSnapshot) => {
+      if (snapshot.val()) {
+        presenceCleanup = await setupPresence();
+        setNodeStatus("online");
+      } else {
         if (presenceCleanup) {
           presenceCleanup();
         }
-        off(connectRef);
-        off(presenceRef);
-        off(clientTasksRef);
-      };
-      // Rest of your code...
-    } else {
-      console.error("Database is not initialized");
-    }
-  }, [showAllTasks, user.uid, user.email]);
+        setNodeStatus("offline");
+      }
+    };
+
+    // Presence handler with proper filtering
+    const handlePresence = (snapshot: DataSnapshot) => {
+      const presenceData = snapshot.val();
+      if (!presenceData) {
+        setNetworkNodes(0);
+        return;
+      }
+
+      // Only count valid presence entries
+      const activeNodes = Object.entries(presenceData).filter(([id, data]) => {
+        const presence = data as PresenceData;
+        return (
+          id && 
+          presence.lastSeen && 
+          presence.status && 
+          presence.type === "client" && 
+          new Date().getTime() - new Date(presence.lastSeen).getTime() < 60000
+        );
+      }).length;
+
+      setNetworkNodes(activeNodes);
+    };
+
+     // Tasks handler
+     const handleTasks = async (snapshot: DataSnapshot) => {
+      const tasks = snapshot.val();
+      if (!tasks) return;
+
+      // Process assigned tasks
+      Object.entries(tasks).forEach(async ([taskId, task]) => {
+        const typedTask = task as Task;
+        console.log("Task:", taskId, typedTask);
+        if (
+          typedTask.assignedTo === newClientId &&
+          typedTask.status === "assigned"
+        ) {
+          console.log("Executing assigned task:", taskId);
+          await executeTask(taskId, typedTask);
+        }
+      });
+
+      // Update recent tasks
+      const tasksList = Object.entries(tasks)
+        .map(([, data]) => ({
+          ...(data as Task),
+        }))
+        .filter((task) => task.userId === user.uid)
+        .filter((task) => showAllTasks || task.clientId === newClientId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, 10);
+
+      setRecentTasks(tasksList);
+    };
+
+    // Set up listeners
+    onValue(connectRef, handleConnection);
+    onValue(presenceRef, handlePresence);
+    onValue(clientTasksRef, handleTasks);
+
+    // Cleanup
+    return () => {
+      if (presenceCleanup) {
+        presenceCleanup();
+      }
+      off(connectRef);
+      off(presenceRef);
+      off(clientTasksRef);
+    };
+  } else {
+    console.error("Database is not initialized");
+  }
+}, [showAllTasks, user.uid, user.email]);
+
+
+
 
   // Task handlers
   const handleRunLocally = async () => {
@@ -525,6 +557,8 @@ export default function DashNetwork({ user }: DashNetworkProps) {
       }
     }
   };
+
+
   const executeTask = async (taskId: string, task: Task) => {
     console.log("Executing task:", task);
     setClientId(localStorage.getItem("clientId") || "");
@@ -713,6 +747,40 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     [recentTasks],
   );
 
+  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  
+  const connectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      setOutput('Please install MetaMask to use this feature.');
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      // Request account access
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      
+      setWalletAddress(accounts[0]);
+      setOutput(`Wallet connected: ${accounts[0]}`);
+      
+      // Listen for account changes
+      window.ethereum.on('accountsChanged', (newAccounts: string[]) => {
+        setWalletAddress(newAccounts[0]);
+      });
+      
+    } catch (error) {
+      setOutput(`Error connecting wallet: ${(error as Error).message}`);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  
+
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* Left Sidebar */}
@@ -764,6 +832,25 @@ export default function DashNetwork({ user }: DashNetworkProps) {
             </div>
             <div className="mt-2 text-sm text-muted-foreground">
               {"User ID : " + user.uid}
+            </div>
+
+             {/* Add Wallet Connect Button */}
+             <div className="mt-4 hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={connectWallet}
+                disabled={isConnecting}
+                className="w-full"
+              >
+                <Wallet className="mr-2 h-4 w-4" />
+                {isConnecting ? 'Connecting...' : walletAddress ? 'Connected' : 'Connect Wallet'}
+              </Button>
+              {walletAddress && (
+                <div className="mt-2 truncate text-xs text-muted-foreground">
+                  {`Wallet: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`}
+                </div>
+              )}
             </div>
           </CardHeader>
         </Card>
