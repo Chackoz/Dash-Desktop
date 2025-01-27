@@ -56,7 +56,7 @@ interface GithubRelease {
 
 interface LoadingPageProps {
   onLoadingComplete: () => void;
-  currentVersion: string; 
+  currentVersion: string;
 }
 
 export const LoadingPage: React.FC<LoadingPageProps> = ({
@@ -115,7 +115,18 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         ]);
       }
     } catch (error) {
-      console.error("Failed to check for updates:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("Failed to check for updates:", errorMessage);
+      setSystemErrors((prev) => [
+        ...prev,
+        {
+          type: "warning",
+          severity: "warning",
+          message: "Update Check Failed",
+          details: "Unable to check for updates. Please try again later.",
+        },
+      ]);
     }
   };
 
@@ -211,10 +222,10 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
     const getAndUpdateSpecs = async () => {
       try {
         if (!auth) {
-          return;
+          throw new Error("Authentication service not available");
         }
         setLoadingStage(1);
-        await checkForUpdates(); // Check for updates during initialization
+        await checkForUpdates();
         await new Promise((resolve) => setTimeout(resolve, 1800));
         const user = auth.currentUser;
 
@@ -232,7 +243,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
         const clientId = localStorage.getItem("clientId");
         if (!database) {
-          return;
+          throw new Error("Database service not available");
         }
 
         if (clientId) {
@@ -292,6 +303,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         size="icon"
         onClick={toggleTheme}
         className="absolute right-4 top-4 rounded-full"
+        aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
       >
         {isDarkMode ? (
           <Sun className="h-4 w-4" />
