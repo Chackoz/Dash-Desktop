@@ -16,108 +16,80 @@ jobs:
     runs-on: ${{ matrix.platform }}
     
     env:
-      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-      NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
       SKIP_PREFLIGHT_CHECK: true
       NEXT_TELEMETRY_DISABLED: 1
 
     steps:
-      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Install Rust
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
-      # # Install dependencies for Arch Linux
-      # - name: Install dependencies (Arch only)
-      #   if: matrix.platform == 'archlinux'
-      #   run: |
-      #     sudo pacman -Syu --noconfirm
-      #     sudo pacman -S --needed --noconfirm \
-      #       webkit2gtk \
-      #       gtk3 \
-      #       libsoup \
-      #       libappindicator-gtk3 \
-      #       librsvg \
-      #       rustup nodejs npm
-      #     rustup default stable
-      #     rustup target add x86_64-unknown-linux-gnu
-
-      # Install dependencies for macOS
       - name: Install dependencies (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
           brew install gtk+3 librsvg
 
-      # Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
-      # Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      # Install frontend dependencies
       - name: Install frontend dependencies
         run: |
           npm install
           npm install -D @tauri-apps/cli
 
-      # Create Next.js config
-      - name: Create Next.js config
+      - name: Create env file
         run: |
-          echo 'const nextConfig = {
-            output: "export",
-            images: { unoptimized: true },
-            experimental: { appDir: true }
-          };
-          module.exports = nextConfig;' > next.config.js
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_DATABASE_URL=${{ secrets.FIREBASE_DATABASE_URL }}" >> .env.local
 
-      # Add environment validation step
-      - name: Validate environment variables
-        run: |
-          echo "Checking Firebase configuration..."
-          if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ]; then
-            echo "Error: FIREBASE_API_KEY is not set"
-            exit 1
-          fi
-          if [ -z "$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" ]; then
-            echo "Error: FIREBASE_AUTH_DOMAIN is not set"
-            exit 1
-          fi
-          # Add checks for other required variables...
-          echo "Firebase configuration validated successfully"
-
-      # Build Next.js
+      
       - name: Build Next.js
         run: npm run build
         env:
           CI: true
           NODE_ENV: production
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
 
-      # Build Tauri App
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_ENV: production
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Dash Desktop ${{ github.ref_name }}'
