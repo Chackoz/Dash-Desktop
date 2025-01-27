@@ -58,9 +58,8 @@ jobs:
           npm install
           npm install -D @tauri-apps/cli
 
-
-          - name: Create and verify env file
-          run: |
+      - name: Create and verify env file
+        run: |
             # Create .env.local file based on the platform
             if [[ "$OSTYPE" == "darwin"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
               # For macOS/Linux
@@ -95,7 +94,7 @@ jobs:
             echo "Checking if env file has content (will show number of lines):"
             (Get-Content .env.local | Measure-Object -Line).Lines
 
-            
+
       - name: Build Next.js
         run: npm run build
         env:
