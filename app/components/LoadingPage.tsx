@@ -88,8 +88,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
       const latest = release.tag_name.replace(/[^0-9.]/g, "");
 
       if (current < latest) {
-        setSystemErrors((prev) => [
-          ...prev,
+        setSystemErrors([
           {
             type: "update",
             severity: "warning",
@@ -164,26 +163,26 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
         ),
       });
     } else {
-      // try {
-      //   await invoke("run_docker_hub_image", {
-      //     image: "hello-world",
-      //     memory_limit: "128m",
-      //   });
-      // } catch (error) {
-      //   console.log("Docker Desktop error:", error);
-      //   errors.push({
-      //     type: "docker",
-      //     severity: "critical",
-      //     message: "Docker Desktop is not running",
-      //     details:
-      //       "Docker Desktop is installed but not running. Please start Docker Desktop and try again.",
-      //     action: (
-      //       <p className="text-sm text-muted-foreground">
-      //         Start Docker Desktop from your applications menu
-      //       </p>
-      //     ),
-      //   });
-      // }
+      try {
+        await invoke("run_docker_hub_image", {
+          image: "hello-world",
+          memory_limit: "128m",
+        });
+      } catch (error) {
+        console.log("Docker Desktop error:", error);
+        errors.push({
+          type: "docker",
+          severity: "critical",
+          message: "Docker Desktop is not running",
+          details:
+            "Docker Desktop is installed but not running. Please start Docker Desktop and try again.",
+          action: (
+            <p className="text-sm text-muted-foreground">
+              Start Docker Desktop from your applications menu
+            </p>
+          ),
+        });
+      }
     }
 
     return errors;
@@ -368,28 +367,34 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {systemErrors.map((error, index) => (
-                <Alert
-                  key={index}
-                  variant={
-                    error.severity === "critical" ? "destructive" : "default"
-                  }
-                  className="text-left"
-                >
-                  <AlertTitle className="flex items-center gap-2">
-                    {error.type === "update" ? (
-                      <ArrowUpCircle className="h-4 w-4" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4" />
-                    )}
-                    {error.message}
-                  </AlertTitle>
-                  <AlertDescription className="mt-2 space-y-2">
-                    <p className="text-sm">{error.details}</p>
-                    {error.action}
-                  </AlertDescription>
-                </Alert>
-              ))}
+              {systemErrors
+                .filter(
+                  (error, index, self) =>
+                    self.findIndex((e) => e.message === error.message) ===
+                    index,
+                )
+                .map((error, index) => (
+                  <Alert
+                    key={index}
+                    variant={
+                      error.severity === "critical" ? "destructive" : "default"
+                    }
+                    className="text-left"
+                  >
+                    <AlertTitle className="flex items-center gap-2">
+                      {error.type === "update" ? (
+                        <ArrowUpCircle className="h-4 w-4" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4" />
+                      )}
+                      {error.message}
+                    </AlertTitle>
+                    <AlertDescription className="mt-2 space-y-2">
+                      <p className="text-sm">{error.details}</p>
+                      {error.action}
+                    </AlertDescription>
+                  </Alert>
+                ))}
 
               {systemErrors.some(
                 (e) => e.type === "docker" || e.type === "python",

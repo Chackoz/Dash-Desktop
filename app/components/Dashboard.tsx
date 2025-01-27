@@ -378,7 +378,7 @@ useEffect(() => {
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         )
-        .slice(0, 10);
+        
 
       setRecentTasks(tasksList);
     };
@@ -930,9 +930,14 @@ useEffect(() => {
                       </Button>
                     )} */}
                   </div>
-                  <span className="text-xs text-muted-foreground">
+                <div className="flex gap-2">
+                <span className="text-xs text-muted-foreground">
                     {new Date(task.createdAt).toLocaleTimeString()}
                   </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(task.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
                 </button>
               ))}
             </div>

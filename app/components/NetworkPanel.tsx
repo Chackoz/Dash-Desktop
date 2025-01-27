@@ -165,11 +165,13 @@ const NetworkTopology: React.FC = () => {
               <Clock className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Average Latency</h3>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">
+            <div className="mt-2 flex flex-col items-center justify-center">
+              <p className="text-center text-2xl font-bold">
                 {currentStats.averageLatency}s
               </p>
-              <p className="text-sm text-muted-foreground">Response Time</p>
+              <p className="text-center text-sm text-muted-foreground">
+                Response Time
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -180,11 +182,13 @@ const NetworkTopology: React.FC = () => {
               <CheckSquare className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Tasks Today</h3>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">
+            <div className="mt-2 flex-col items-center justify-center">
+              <p className="text-center text-2xl font-bold">
                 {currentStats.totalTasksToday}
               </p>
-              <p className="text-sm text-muted-foreground">Total Processed</p>
+              <p className="text-center text-sm text-muted-foreground">
+                Total Processed
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -195,9 +199,13 @@ const NetworkTopology: React.FC = () => {
               <Zap className="h-5 w-5 text-primary" />
               <h3 className="text-sm font-medium">Recent Tasks</h3>
             </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{currentStats.tasksLastHour}</p>
-              <p className="text-sm text-muted-foreground">Last Hour</p>
+            <div className="mt-2 flex-col items-center justify-center">
+              <p className="text-center text-2xl font-bold">
+                {currentStats.tasksLastHour}
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                Last Hour
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -268,13 +276,13 @@ const NetworkChat: React.FC<NetworkChatProps> = ({ userId, userName }) => {
               }`}
             >
               <div
-                className={`max-w-[70%] rounded-lg p-3 ${
+                className={`max-w-[80%] rounded-lg p-3 ${
                   message.senderId === userId
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted"
                 }`}
               >
-                <div className="mb-1 text-xs opacity-70">
+                <div className="mb-1 w-fit text-xs opacity-70">
                   {message.senderName.replaceAll("-", "@ ")}
                 </div>
                 <div>{message.content}</div>
