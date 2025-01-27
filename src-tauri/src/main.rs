@@ -68,21 +68,25 @@ fn check_docker() -> bool {
 }
 
 fn get_version(cmd: &str, args: &[&str]) -> Option<String> {
-    Command::new(cmd)
-        .args(args)
+    let mut command = Command::new(cmd);
+    command.args(args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-        .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                String::from_utf8(output.stdout)
-                    .ok()
-                    .map(|v| v.trim().to_string())
-            } else {
-                None
-            }
-        })
+        .stderr(Stdio::null());
+    
+    #[cfg(target_os = "windows")]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command.output().ok().and_then(|output| {
+        if output.status.success() {
+            String::from_utf8(output.stdout)
+                .ok()
+                .map(|v| v.trim().to_string())
+        } else {
+            None
+        }
+    })
 }
 
 #[tauri::command]
@@ -176,27 +180,49 @@ pub async fn run_with_docker(
         ));
     }
 
-    let run_output = Command::new("docker")
-        .args([
-            "run",
-            "--rm",
-            "--name", &format!("runner-{}", container_id),
-            "--memory", "512m",
-            "--cpus", "1",
-            "--network", "none",
-            "--security-opt", "no-new-privileges",
-            &format!("python-runner-{}", container_id),
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| format!("Docker run failed: {}", e))?;
     
-    let _ = Command::new("docker")
-        .args(["rmi", "-f", &format!("python-runner-{}", container_id)])
+    
+     // Create and run the `docker` command
+     let mut command = Command::new("docker");
+     command.args([
+         "run",
+         "--rm",
+         "--name",
+         &format!("runner-{}", container_id),
+         "--memory",
+         "512m",
+         "--cpus",
+         "1",
+         "--network",
+         "none",
+         "--security-opt",
+         "no-new-privileges",
+         &format!("python-runner-{}", container_id),
+     ]);
+
+      // Add Windows-specific flag
+    #[cfg(target_os = "windows")]
+    command.creation_flags(0x08000000);
+
+    let run_output = command
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .output()
+    .map_err(|e| format!("Docker run failed: {}", e))?;
+    
+    let mut _command = Command::new("docker");
+    _command.args(["rmi", "-f", &format!("python-runner-{}", container_id)]);
+
+    #[cfg(target_os = "windows")]
+    _command.creation_flags(0x08000000);
+
+
+    
+    let _ = _command
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output();
+    
     
     let stdout = String::from_utf8_lossy(&run_output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&run_output.stderr).to_string();
@@ -315,9 +341,16 @@ async fn run_docker_hub_image(
     timeout: Option<String>,
 ) -> Result<String, String> {
     let container_id = id.unwrap_or_else(|| "default".to_string());
+
+    let mut pullcommand = Command::new("docker");
+    pullcommand.args(["pull", &image]);
+
+    #[cfg(target_os = "windows")]
+    {
+        pullcommand.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
     
-    let pull_output = Command::new("docker")
-        .args(["pull", &image])
+    let pull_output = pullcommand
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -339,6 +372,8 @@ async fn run_docker_hub_image(
         "--security-opt".to_string(), 
         "no-new-privileges".to_string(),
     ]);
+
+   
     
     if let Some(mem) = memory_limit {
         run_args.extend(vec!["--memory".to_string(), mem]);
@@ -358,8 +393,16 @@ async fn run_docker_hub_image(
         run_args.extend(cmd);
     }
 
-    let run_output = Command::new("docker")
-        .args(&run_args)
+    let mut _command = Command::new("docker");
+    _command .args(&run_args);
+
+    #[cfg(target_os = "windows")]
+    {
+        _command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    let run_output =_command
+       
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
