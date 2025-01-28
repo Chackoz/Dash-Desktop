@@ -1,1 +1,1 @@
-export const currentDASHVersion = "1.9.0";
+export const currentDASHVersion = "1.9.1";

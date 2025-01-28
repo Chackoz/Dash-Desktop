@@ -609,6 +609,7 @@ useEffect(() => {
 
       await update(ref(database, `tasks/${taskId}`), {
         status: "completed",
+        doneUserId: user.uid,
         output: result,
         completedAt: new Date().toISOString(),
       });
@@ -618,6 +619,7 @@ useEffect(() => {
       }
       await update(ref(database, `tasks/${taskId}`), {
         status: "failed",
+        doneUserId: user.uid,
         output: `Error: ${(error as Error).toString()}`,
         completedAt: new Date().toISOString(),
       });
@@ -1186,8 +1188,10 @@ useEffect(() => {
               </>
             )}
 
-            <div className="mt-4">
-              <div className="mb-2 flex items-center space-x-2">
+            <div className={`mt-4 h-full ${
+                  isDockerMode ? "max-h-[50%]" : "max-h-[30%]"
+                }`}>
+              <div className="mb-2 flex items-center space-x-2 ">
                 <Terminal className="h-4 w-4" />
                 <span className="font-medium">Output</span>
               </div>
