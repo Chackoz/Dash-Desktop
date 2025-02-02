@@ -44,13 +44,11 @@ class FirebaseService {
     return FirebaseService.instance;
   }
 
-  get database(): Database {
-    if (!this._database) throw new Error('Database not initialized');
+  get database(): Database|undefined {
     return this._database;
   }
 
-  get auth(): Auth {
-    if (!this._auth) throw new Error('Auth not initialized');
+  get auth(): Auth|undefined {
     return this._auth;
   }
 }

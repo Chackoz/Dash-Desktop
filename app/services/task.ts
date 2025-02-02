@@ -11,6 +11,16 @@ export class TaskService {
   ): Promise<string> {
     const database = firebaseService.database;
     const auth = firebaseService.auth;
+    if (!database) {
+      console.error('Database not found');
+      return "";
+    }
+    if (!auth) {
+      console.error('Database not found');
+      return "";
+    }
+    
+    
     const tasksRef = ref(database, 'tasks');
     const newTaskRef = push(tasksRef);
     const userId = auth.currentUser?.uid;
@@ -49,8 +59,11 @@ export class TaskService {
     error?: string
   ): Promise<void> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
     const taskRef = ref(database, `tasks/${taskId}`);
-
     const updates: Partial<Task> = {
       status,
       updatedAt: new Date().toISOString(),
@@ -77,6 +90,10 @@ export class TaskService {
     workerId: string
   ): Promise<void> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
     const taskRef = ref(database, `tasks/${taskId}`);
 
     try {
@@ -94,6 +111,10 @@ export class TaskService {
 
   static async getTasksByUserId(userId: string): Promise<Task[]> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return [];
+    }
     const tasksRef = ref(database, 'tasks');
     
     try {
@@ -122,6 +143,10 @@ export class TaskService {
 
   static async getTaskById(taskId: string): Promise<Task | null> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return null;
+    }
     const taskRef = ref(database, `tasks/${taskId}`);
 
     try {
@@ -141,6 +166,10 @@ export class TaskService {
 
   static async getPendingTasks(): Promise<Task[]> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return [];
+    }
     const tasksRef = ref(database, 'tasks');
     
     try {
@@ -169,6 +198,10 @@ export class TaskService {
 
   static async deleteTask(taskId: string): Promise<void> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
     const taskRef = ref(database, `tasks/${taskId}`);
 
     try {

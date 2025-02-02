@@ -9,8 +9,13 @@ export class NodeService {
       console.log('Client ID is missing');
       return;
     };
+    
 
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
     const presenceRef = ref(database, `presence/${clientId}`);
 
     try {
@@ -30,6 +35,10 @@ export class NodeService {
     metadata: Partial<NetworkNode['metadata']>,
   ): Promise<void> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
     const nodeRef = ref(database, `presence/${nodeId}`);
 
     try {

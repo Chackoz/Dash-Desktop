@@ -10,7 +10,12 @@ export class ChatService {
     content: string,
   ): Promise<string> {
     const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return "";
+    }
     const messagesRef = ref(database, 'messages');
+
     const newMessageRef = push(messagesRef);
 
     const message: ChatMessage = {
