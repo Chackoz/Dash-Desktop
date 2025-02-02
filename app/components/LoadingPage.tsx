@@ -16,48 +16,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { invoke } from "@tauri-apps/api/core";
-import { auth, database } from "@/app/utils/firebaseConfig";
+
 import { ref, update } from "firebase/database";
+import { firebaseService } from "../services/firebase";
+import {
+  GithubRelease,
+  LoadingPageProps,
+  SystemError,
+  SystemSpecs,
+} from "../types/types";
 
-interface SystemSpecs {
-  os: string;
-  cpu: string;
-  ram: string;
-  gpu?: string;
-  gpuVram?: string;
-  docker: boolean;
-  python?: string;
-  node?: string;
-  rust?: string;
-  email?: string;
-  displayName?: string;
-}
-
-interface SystemError {
-  type:
-    | "docker"
-    | "python"
-    | "hardware"
-    | "general"
-    | "warning"
-    | "destructive"
-    | "update";
-  message: string;
-  details?: string;
-  severity: "critical" | "warning" | "destructive";
-  action?: React.ReactNode;
-}
-
-interface GithubRelease {
-  tag_name: string;
-  html_url: string;
-  body: string;
-}
-
-interface LoadingPageProps {
-  onLoadingComplete: () => void;
-  currentVersion: string;
-}
+const database = firebaseService.database;
+const auth = firebaseService.auth;
 
 export const LoadingPage: React.FC<LoadingPageProps> = ({
   onLoadingComplete,

@@ -1,11 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { ref, onValue, off, DataSnapshot } from "firebase/database";
-import {
-  database,
-  ChatMessage,
-  sendChatMessage,
-} from "@/app/utils/firebaseConfig";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,37 +15,19 @@ import {
   Clock,
   CheckSquare,
 } from "lucide-react";
+import { ChatService } from "../services/chat";
+import {
+  ChatMessage,
+  MessageData,
+  MessagesData,
+  NetworkChatProps,
+  NetworkStats,
+  PresenceNode,
+} from "../types/types";
+import { firebaseService } from "../services/firebase";
 
-interface NetworkChatProps {
-  userId: string;
-  userName: string;
-}
-
-interface MessagesData {
-  [key: string]: Omit<ChatMessage, "id">;
-}
-
-interface NetworkStats {
-  activeUsers: number;
-  totalTasksToday: number;
-  averageLatency: number;
-  tasksLastHour: number;
-  timestamp: number;
-}
-
-interface PresenceNode {
-  type: "client" | "server";
-  lastSeen: string;
-  status: string;
-  userId?: string;
-}
-
-interface MessageData {
-  timestamp: string;
-  senderId: string;
-  senderName: string;
-  content: string;
-}
+const database = firebaseService.database;
+const sendChatMessage = ChatService.sendMessage;
 
 const NetworkTopology: React.FC = () => {
   const [currentStats, setCurrentStats] = useState<NetworkStats>({

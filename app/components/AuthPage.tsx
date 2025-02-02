@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { auth, database } from "@/app/utils/firebaseConfig";
+
 import { ref, set } from "firebase/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,14 +30,11 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTheme } from "./ThemeProvider";
+import { firebaseService } from "../services/firebase";
+import { SystemSpecs } from "../types/types";
 
-interface SystemSpecs {
-  os: string;
-  cpu: string;
-  ram: string;
-  gpu?: string;
-  gpuVram?: string;
-}
+const database = firebaseService.database;
+const auth = firebaseService.auth;
 
 export const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);

@@ -1,8 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { User } from "firebase/auth";
-import { auth, DockerConfig, Task } from "@/app/utils/firebaseConfig";
-import { signOut } from "firebase/auth";
+
 import {
   ref,
   onValue,
@@ -20,11 +18,7 @@ import {
   PlayCircle,
   Terminal,
   Upload,
-  Clock,
-  CheckCircle,
-  XCircle,
   Loader,
-  Timer,
   Sun,
   Moon,
   FileText,
@@ -33,11 +27,7 @@ import {
   ArrowUpCircle,
   Wallet,
 } from "lucide-react";
-import {
-  createTask,
-  database,
-  updateNodeStatus,
-} from "@/app/utils/firebaseConfig";
+
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -56,10 +46,26 @@ import { githubDark } from "@uiw/codemirror-theme-github";
 import { useTheme } from "./ThemeProvider";
 import NetworkPanel from "./NetworkPanel";
 import { currentDASHVersion } from "../data/data";
+import {
+  DashNetworkProps,
+  DockerConfig,
+  GithubRelease,
+  PresenceData,
+  SystemMetadata,
+  Task,
+} from "../types/types";
+import TaskStatus from "./ui/TaskStatus";
+import { signOut } from "firebase/auth";
+import { firebaseService } from "../services/firebase";
+import { TaskService } from "../services/task";
+import { NodeService } from "../services/node";
 
+const auth = firebaseService.auth;
+const database = firebaseService.database;
 
+const updateNodeStatus = NodeService.updateNodeStatus;
+const createTask = TaskService.createTask;
 
-// Add type declaration for window.ethereum
 declare global {
   interface Window {
     ethereum?: {
@@ -70,63 +76,6 @@ declare global {
 }
 
 
-interface DashNetworkProps {
-  user: User;
-}
-
-interface GithubRelease {
-  tag_name: string;
-  html_url: string;
-  body: string;
-}
-
-interface SystemMetadata {
-  os: string;
-  cpu: string;
-  ram: string;
-  gpu?: string;
-  gpuVram?: string;
-  docker: boolean;
-  python?: string;
-  node?: string;
-  rust?: string;
-}
-
-interface PresenceData {
-  status: "idle" | "online" | "offline" | "busy";
-  lastSeen: string;
-  type: "client" | "worker";
-  email: string;
-  userId?: string;
-  systemMetadata?: SystemMetadata;
-}
-
-const TaskStatus = React.memo<{
-  status: Task["status"];
-  output?: Task["output"];
-}>(({ status }) => {
-  const statusConfig = {
-    completed: { icon: CheckCircle, color: "text-green-500", animate: false },
-    assigned: { icon: Loader, color: "text-blue-500", animate: true },
-    failed: { icon: XCircle, color: "text-red-500", animate: false },
-    running: { icon: Loader, color: "text-blue-500", animate: true },
-    pending: { icon: Clock, color: "text-blue-500", animate: true },
-  };
-
-  const config = statusConfig[status] || {
-    icon: Timer,
-    color: "text-gray-500",
-  };
-  const Icon = config.icon;
-
-  return (
-    <div className={`flex items-center ${config.color}`}>
-      <Icon className={`h-4 w-4 ${config.animate ? "animate-spin" : ""}`} />
-    </div>
-  );
-});
-
-TaskStatus.displayName = "TaskStatus";
 
 export default function DashNetwork({ user }: DashNetworkProps) {
   const [code, setCode] = useState("");
@@ -158,6 +107,18 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   );
   const [currentVersion, setCurrentVersion] = useState(currentDASHVersion);
   const [hasUpdate, setHasUpdate] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+      } else {
+        console.error("Auth is not initialized");
+      }
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const TaskDetails: React.FC<{ task: Task; onClose: () => void }> = React.memo(
     ({ task }) => (
@@ -215,18 +176,6 @@ export default function DashNetwork({ user }: DashNetworkProps) {
 
   TaskDetails.displayName = "TaskDetails";
 
-  const handleLogout = async () => {
-    try {
-      if (auth) {
-        await signOut(auth);
-      } else {
-        console.error("Auth is not initialized");
-      }
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
-
   const { isDarkMode, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -253,157 +202,154 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     checkForUpdates();
   }, [currentVersion]);
 
-
-
   // Update the useEffect for presence
-useEffect(() => {
-  if (database) {
-    const presenceRef = ref(database, "presence");
-    const connectRef = ref(database, ".info/connected");
-    const clientTasksRef = ref(database, "tasks");
+  useEffect(() => {
+    if (database) {
+      const presenceRef = ref(database, "presence");
+      const connectRef = ref(database, ".info/connected");
+      const clientTasksRef = ref(database, "tasks");
 
-    // Generate or retrieve client ID
-    const storedClientId = localStorage.getItem("clientId");
-    let newClientId: string;
+      // Generate or retrieve client ID
+      const storedClientId = localStorage.getItem("clientId");
+      let newClientId: string;
 
-    if (!storedClientId) {
-      const newRef = push(presenceRef);
-      newClientId = newRef.key || "";
-      localStorage.setItem("clientId", newClientId);
-    } else {
-      newClientId = storedClientId;
-    }
+      if (!storedClientId) {
+        const newRef = push(presenceRef);
+        newClientId = newRef.key || "";
+        localStorage.setItem("clientId", newClientId);
+      } else {
+        newClientId = storedClientId;
+      }
 
-    setClientId(newClientId);
+      setClientId(newClientId);
 
-    // Set up presence with proper path
-    const setupPresence = async () => {
-      if (!newClientId) return;
-      if (!database) return;
+      // Set up presence with proper path
+      const setupPresence = async () => {
+        if (!newClientId) return;
+        if (!database) return;
 
-      const clientPresenceRef = ref(database, `presence/${newClientId}`);
-      
-      // Get system metadata
-      const systemMetadata = await invoke<SystemMetadata>("get_system_specs");
+        const clientPresenceRef = ref(database, `presence/${newClientId}`);
 
-      const presenceData: PresenceData = {
-        status: "idle",
-        lastSeen: new Date().toISOString(),
-        type: "client",
-        userId: user.uid,
-        email: user.email||"",
-        systemMetadata
+        // Get system metadata
+        const systemMetadata = await invoke<SystemMetadata>("get_system_specs");
+
+        const presenceData: PresenceData = {
+          status: "idle",
+          lastSeen: new Date().toISOString(),
+          type: "client",
+          userId: user.uid,
+          email: user.email || "",
+          systemMetadata,
+        };
+
+        // Set initial presence
+        set(clientPresenceRef, presenceData);
+
+        // Set up disconnect cleanup
+        onDisconnect(clientPresenceRef).remove();
+
+        // Set up periodic presence updates
+        const presenceInterval = setInterval(() => {
+          update(clientPresenceRef, {
+            lastSeen: new Date().toISOString(),
+          });
+        }, 30000); // Update every 30 seconds
+
+        return () => clearInterval(presenceInterval);
       };
 
-      // Set initial presence
-      set(clientPresenceRef, presenceData);
+      let presenceCleanup: (() => void) | undefined;
 
-      // Set up disconnect cleanup
-      onDisconnect(clientPresenceRef).remove();
+      // Connection handler
+      const handleConnection = async (snapshot: DataSnapshot) => {
+        if (snapshot.val()) {
+          presenceCleanup = await setupPresence();
+          setNodeStatus("online");
+        } else {
+          if (presenceCleanup) {
+            presenceCleanup();
+          }
+          setNodeStatus("offline");
+        }
+      };
 
-      // Set up periodic presence updates
-      const presenceInterval = setInterval(() => {
-        update(clientPresenceRef, {
-          lastSeen: new Date().toISOString(),
+      // Presence handler with proper filtering
+      const handlePresence = (snapshot: DataSnapshot) => {
+        const presenceData = snapshot.val();
+        if (!presenceData) {
+          setNetworkNodes(0);
+          return;
+        }
+
+        // Only count valid presence entries
+        const activeNodes = Object.entries(presenceData).filter(
+          ([id, data]) => {
+            const presence = data as PresenceData;
+            return (
+              id &&
+              presence.lastSeen &&
+              presence.status &&
+              presence.type === "client" &&
+              new Date().getTime() - new Date(presence.lastSeen).getTime() <
+                60000
+            );
+          },
+        ).length;
+
+        setNetworkNodes(activeNodes);
+      };
+
+      // Tasks handler
+      const handleTasks = async (snapshot: DataSnapshot) => {
+        const tasks = snapshot.val();
+        if (!tasks) return;
+
+        // Process assigned tasks
+        Object.entries(tasks).forEach(async ([taskId, task]) => {
+          const typedTask = task as Task;
+          console.log("Task:", taskId, typedTask);
+          if (
+            typedTask.assignedTo === newClientId &&
+            typedTask.status === "assigned"
+          ) {
+            console.log("Executing assigned task:", taskId);
+            await executeTask(taskId, typedTask);
+          }
         });
-      }, 30000); // Update every 30 seconds
 
-      return () => clearInterval(presenceInterval);
-    };
+        // Update recent tasks
+        const tasksList = Object.entries(tasks)
+          .map(([, data]) => ({
+            ...(data as Task),
+          }))
+          .filter((task) => task.userId === user.uid)
+          .filter((task) => showAllTasks || task.clientId === newClientId)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
 
-    let presenceCleanup: (() => void) | undefined;
+        setRecentTasks(tasksList);
+      };
 
-    // Connection handler
-    const handleConnection = async (snapshot: DataSnapshot) => {
-      if (snapshot.val()) {
-        presenceCleanup = await setupPresence();
-        setNodeStatus("online");
-      } else {
+      // Set up listeners
+      onValue(connectRef, handleConnection);
+      onValue(presenceRef, handlePresence);
+      onValue(clientTasksRef, handleTasks);
+
+      // Cleanup
+      return () => {
         if (presenceCleanup) {
           presenceCleanup();
         }
-        setNodeStatus("offline");
-      }
-    };
-
-    // Presence handler with proper filtering
-    const handlePresence = (snapshot: DataSnapshot) => {
-      const presenceData = snapshot.val();
-      if (!presenceData) {
-        setNetworkNodes(0);
-        return;
-      }
-
-      // Only count valid presence entries
-      const activeNodes = Object.entries(presenceData).filter(([id, data]) => {
-        const presence = data as PresenceData;
-        return (
-          id && 
-          presence.lastSeen && 
-          presence.status && 
-          presence.type === "client" && 
-          new Date().getTime() - new Date(presence.lastSeen).getTime() < 60000
-        );
-      }).length;
-
-      setNetworkNodes(activeNodes);
-    };
-
-     // Tasks handler
-     const handleTasks = async (snapshot: DataSnapshot) => {
-      const tasks = snapshot.val();
-      if (!tasks) return;
-
-      // Process assigned tasks
-      Object.entries(tasks).forEach(async ([taskId, task]) => {
-        const typedTask = task as Task;
-        console.log("Task:", taskId, typedTask);
-        if (
-          typedTask.assignedTo === newClientId &&
-          typedTask.status === "assigned"
-        ) {
-          console.log("Executing assigned task:", taskId);
-          await executeTask(taskId, typedTask);
-        }
-      });
-
-      // Update recent tasks
-      const tasksList = Object.entries(tasks)
-        .map(([, data]) => ({
-          ...(data as Task),
-        }))
-        .filter((task) => task.userId === user.uid)
-        .filter((task) => showAllTasks || task.clientId === newClientId)
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        
-
-      setRecentTasks(tasksList);
-    };
-
-    // Set up listeners
-    onValue(connectRef, handleConnection);
-    onValue(presenceRef, handlePresence);
-    onValue(clientTasksRef, handleTasks);
-
-    // Cleanup
-    return () => {
-      if (presenceCleanup) {
-        presenceCleanup();
-      }
-      off(connectRef);
-      off(presenceRef);
-      off(clientTasksRef);
-    };
-  } else {
-    console.error("Database is not initialized");
-  }
-}, [showAllTasks, user.uid, user.email]);
-
-
-
+        off(connectRef);
+        off(presenceRef);
+        off(clientTasksRef);
+      };
+    } else {
+      console.error("Database is not initialized");
+    }
+  }, [showAllTasks, user.uid, user.email]);
 
   // Task handlers
   const handleRunLocally = async () => {
@@ -557,7 +503,6 @@ useEffect(() => {
       }
     }
   };
-
 
   const executeTask = async (taskId: string, task: Task) => {
     console.log("Executing task:", task);
@@ -752,36 +697,32 @@ useEffect(() => {
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [isConnecting, setIsConnecting] = useState(false);
 
-  
   const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      setOutput('Please install MetaMask to use this feature.');
+    if (typeof window.ethereum === "undefined") {
+      setOutput("Please install MetaMask to use this feature.");
       return;
     }
 
     setIsConnecting(true);
     try {
       // Request account access
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
       });
-      
+
       setWalletAddress(accounts[0]);
       setOutput(`Wallet connected: ${accounts[0]}`);
-      
+
       // Listen for account changes
-      window.ethereum.on('accountsChanged', (newAccounts: string[]) => {
+      window.ethereum.on("accountsChanged", (newAccounts: string[]) => {
         setWalletAddress(newAccounts[0]);
       });
-      
     } catch (error) {
       setOutput(`Error connecting wallet: ${(error as Error).message}`);
     } finally {
       setIsConnecting(false);
     }
   };
-
-  
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -836,8 +777,8 @@ useEffect(() => {
               {"User ID : " + user.uid}
             </div>
 
-             {/* Add Wallet Connect Button */}
-             <div className="mt-4 hidden">
+            {/* Add Wallet Connect Button */}
+            <div className="mt-4 hidden">
               <Button
                 variant="outline"
                 size="sm"
@@ -846,7 +787,11 @@ useEffect(() => {
                 className="w-full"
               >
                 <Wallet className="mr-2 h-4 w-4" />
-                {isConnecting ? 'Connecting...' : walletAddress ? 'Connected' : 'Connect Wallet'}
+                {isConnecting
+                  ? "Connecting..."
+                  : walletAddress
+                    ? "Connected"
+                    : "Connect Wallet"}
               </Button>
               {walletAddress && (
                 <div className="mt-2 truncate text-xs text-muted-foreground">
@@ -932,14 +877,14 @@ useEffect(() => {
                       </Button>
                     )} */}
                   </div>
-                <div className="flex gap-2">
-                <span className="text-xs text-muted-foreground">
-                    {new Date(task.createdAt).toLocaleTimeString()}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(task.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
+                  <div className="flex gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(task.createdAt).toLocaleTimeString()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(task.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -1188,10 +1133,12 @@ useEffect(() => {
               </>
             )}
 
-            <div className={`mt-4 h-full ${
-                  isDockerMode ? "max-h-[50%]" : "max-h-[30%]"
-                }`}>
-              <div className="mb-2 flex items-center space-x-2 ">
+            <div
+              className={`mt-4 h-full ${
+                isDockerMode ? "max-h-[50%]" : "max-h-[30%]"
+              }`}
+            >
+              <div className="mb-2 flex items-center space-x-2">
                 <Terminal className="h-4 w-4" />
                 <span className="font-medium">Output</span>
               </div>

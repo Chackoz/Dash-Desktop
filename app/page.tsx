@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { User } from "firebase/auth";
-import { auth } from "@/app/utils/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { LoadingPage } from "./components/LoadingPage";
 import { AuthPage } from "./components/AuthPage";
 import DashNetwork from "./components/Dashboard";
 import { currentDASHVersion } from "./data/data";
+import { firebaseService } from "./services/firebase";
+
+const auth = firebaseService.auth;
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
