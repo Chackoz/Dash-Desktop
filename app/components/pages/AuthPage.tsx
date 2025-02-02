@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 
 import { ref, set } from "firebase/database";
@@ -26,6 +27,7 @@ import {
   Mail,
   Lock,
   User,
+  KeyRound,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -38,10 +40,12 @@ const auth = firebaseService.auth;
 
 export const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
 
@@ -75,19 +79,53 @@ export const AuthPage = () => {
       setError("Email is required");
       return false;
     }
-    if (!password.trim()) {
+    if (!isResetPassword && !password.trim()) {
       setError("Password is required");
       return false;
     }
-    if (!isLogin && !displayName.trim()) {
+    if (!isLogin && !isResetPassword && !displayName.trim()) {
       setError("Display name is required");
       return false;
     }
-    if (password.length < 6) {
+    if (!isResetPassword && password.length < 6) {
       setError("Password must be at least 6 characters");
       return false;
     }
     return true;
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError("Email is required");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      if (!auth) {
+        throw new Error("Firebase auth not initialized");
+      }
+
+      await sendPasswordResetEmail(auth, email, {
+        url: 'https://dash-webpage.vercel.app/reset-password', 
+        handleCodeInApp: true
+      });
+      setSuccess("Password reset email sent. Please check your inbox.");
+    } catch (error) {
+      let errorMessage = (error as Error).message;
+      if (errorMessage.includes("auth/user-not-found")) {
+        errorMessage = "No account found with this email address.";
+      } else if (errorMessage.includes("auth/invalid-email")) {
+        errorMessage = "Please enter a valid email address.";
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,10 +155,8 @@ export const AuthPage = () => {
       }
     } catch (error) {
       let errorMessage = (error as Error).message;
-      // Improve error messages
       if (errorMessage.includes("auth/email-already-in-use")) {
-        errorMessage =
-          "This email is already registered. Please sign in instead.";
+        errorMessage = "This email is already registered. Please sign in instead.";
       } else if (errorMessage.includes("auth/invalid-email")) {
         errorMessage = "Please enter a valid email address.";
       } else if (errorMessage.includes("auth/wrong-password")) {
@@ -134,10 +170,19 @@ export const AuthPage = () => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
+    setIsResetPassword(false);
     setError("");
+    setSuccess("");
     setEmail("");
     setPassword("");
     setDisplayName("");
+  };
+
+  const toggleResetPassword = () => {
+    setIsResetPassword(!isResetPassword);
+    setError("");
+    setSuccess("");
+    setPassword("");
   };
 
   return (
@@ -164,17 +209,26 @@ export const AuthPage = () => {
       <Card className="w-full max-w-md border border-border bg-card shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">
-            {isLogin ? "Welcome back" : "Create account"}
+            {isResetPassword
+              ? "Reset Password"
+              : isLogin
+              ? "Welcome back"
+              : "Create account"}
           </CardTitle>
           <CardDescription>
-            {isLogin
+            {isResetPassword
+              ? "Enter your email to receive a password reset link"
+              : isLogin
               ? "Enter your credentials to access your workspace"
               : "Enter your details to create your DASH account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+          <form
+            onSubmit={isResetPassword ? handleResetPassword : handleSubmit}
+            className="space-y-4"
+          >
+            {!isLogin && !isResetPassword && (
               <div className="space-y-2">
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -204,23 +258,31 @@ export const AuthPage = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="border-border bg-secondary/50 pl-10"
-                />
+            {!isResetPassword && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="border-border bg-secondary/50 pl-10"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <Alert variant="destructive" className="animate-shake">
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {success && (
+              <Alert variant="default" className="border-green-500 text-green-500">
+                <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
 
@@ -231,21 +293,42 @@ export const AuthPage = () => {
             >
               {isLoading ? (
                 <Loader className="mr-2 h-4 w-4 animate-spin" />
+              ) : isResetPassword ? (
+                <KeyRound className="mr-2 h-4 w-4" />
               ) : (
                 <ArrowRight className="mr-2 h-4 w-4" />
               )}
-              {isLogin ? "Sign In" : "Create Account"}
+              {isResetPassword
+                ? "Send Reset Link"
+                : isLogin
+                ? "Sign In"
+                : "Create Account"}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="mt-2 flex flex-col space-y-4">
+          {isLogin && !isResetPassword && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-sm text-muted-foreground hover:text-primary"
+              onClick={toggleResetPassword}
+            >
+              Forgot your password?
+            </Button>
+          )}
+
           <div className="relative w-full">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-card px-2 text-muted-foreground">
-                {isLogin ? "New to DASH?" : "Already have an account?"}
+                {isResetPassword
+                  ? "Remember your password?"
+                  : isLogin
+                  ? "New to DASH?"
+                  : "Already have an account?"}
               </span>
             </div>
           </div>
@@ -254,9 +337,13 @@ export const AuthPage = () => {
             type="button"
             variant="ghost"
             className="w-full text-muted-foreground hover:text-primary"
-            onClick={toggleMode}
+            onClick={isResetPassword ? toggleResetPassword : toggleMode}
           >
-            {isLogin ? "Create an account" : "Sign in instead"}
+            {isResetPassword
+              ? "Back to Sign In"
+              : isLogin
+              ? "Create an account"
+              : "Sign in instead"}
           </Button>
         </CardFooter>
       </Card>
