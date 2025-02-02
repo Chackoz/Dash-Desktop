@@ -5,7 +5,10 @@ import { firebaseService } from './firebase';
 
 export class NodeService {
   static async updateNodeStatus(clientId: string, status: NodeStatus): Promise<void> {
-    if (!clientId) throw new Error('Client ID is required');
+    if (!clientId) {
+      console.log('Client ID is missing');
+      return;
+    };
 
     const database = firebaseService.database;
     const presenceRef = ref(database, `presence/${clientId}`);

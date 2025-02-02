@@ -87,6 +87,7 @@ export interface Task {
   assignedTo?: string;
   timeLimit?: string;
   userId?: string;
+  completedAt?: string;
 }
 
 // Network & Node Related Types
@@ -144,6 +145,7 @@ export interface GithubRelease {
 
 
 
+// Network Stats Related Types
 export interface NetworkChatProps {
   userId: string;
   userName: string;

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { LoadingPage } from "./components/LoadingPage";
-import { AuthPage } from "./components/AuthPage";
-import DashNetwork from "./components/Dashboard";
+
 import { currentDASHVersion } from "./data/data";
 import { firebaseService } from "./services/firebase";
+import LoadingPage from "./components/pages/LoadingPage";
+import AuthPage from "./components/pages/AuthPage";
+import DashNetwork from "./components/pages/Dashboard";
 
 const auth = firebaseService.auth;
 
