@@ -193,8 +193,6 @@ pub async fn run_with_docker(
          "512m",
          "--cpus",
          "1",
-         "--network",
-         "none",
          "--security-opt",
          "no-new-privileges",
          &format!("python-runner-{}", container_id),
@@ -367,8 +365,6 @@ async fn run_docker_hub_image(
         "--rm".to_string(),
         "--name".to_string(), 
         format!("hub-runner-{}", container_id),
-        "--network".to_string(), 
-        "none".to_string(),
         "--security-opt".to_string(), 
         "no-new-privileges".to_string(),
     ]);

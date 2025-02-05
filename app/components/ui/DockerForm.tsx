@@ -76,7 +76,7 @@ interface DockerFormProps {
   
         <Alert>
           <AlertDescription className="text-sm">
-            Docker containers run with network disabled and limited privileges for security.
+            Docker containers run with limited privileges for security.
           </AlertDescription>
         </Alert>
         
