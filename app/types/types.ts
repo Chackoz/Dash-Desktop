@@ -71,6 +71,11 @@ export type TaskStatus =
   | "failed"
   | "assigned";
 
+export interface UserPoints {
+  totalPoints: number;
+  lastUpdated: string;
+}
+
 export interface Task {
   id?: string;
   clientId: string;
@@ -80,6 +85,7 @@ export interface Task {
   createdAt: string;
   updatedAt?: string;
   workerId?: string;
+  doneUserId?: string;
   error?: string;
   requirements?: string;
   dockerConfig?: DockerConfig;

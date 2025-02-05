@@ -1,6 +1,11 @@
 import { ref, push, set, update, get, query, orderByChild, equalTo } from 'firebase/database';
 import { firebaseService } from './firebase';
 import { DockerConfig, Task} from '../types/types';
+interface UserPoints {
+  totalPoints: number;
+  lastUpdated: string;
+}
+
 
 export class TaskService {
   static async createTask(
@@ -79,6 +84,18 @@ export class TaskService {
 
     try {
       await update(taskRef, updates);
+      if (status === 'completed') {
+        const task = await this.getTaskById(taskId);
+        if (task && task.doneUserId && task.createdAt) {
+          const runtime = this.calculateRuntime(task.createdAt, new Date().toISOString());
+          await this.awardPoints(task.doneUserId||"", runtime);
+        }else{
+          console.error('Error fetching task:', taskId);
+        }
+      }
+      else{
+        console.error('Error fetching task:', taskId);
+      }
     } catch (error) {
       console.error('Error updating task status:', error);
       throw new Error('Failed to update task status');
@@ -209,6 +226,62 @@ export class TaskService {
     } catch (error) {
       console.error('Error deleting task:', error);
       throw new Error('Failed to delete task');
+    }
+  }
+  private static calculateRuntime(startTime: string, endTime: string): number {
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    return Math.floor((end - start) / 1000); 
+  }
+
+  public static async awardPoints(userId: string, seconds: number): Promise<void> {
+    const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      return;
+    }
+
+    const userPointsRef = ref(database, `userPoints/${userId}`);
+
+    try {
+      // Get current points
+      const snapshot = await get(userPointsRef);
+      const currentPoints: UserPoints = snapshot.exists() 
+        ? snapshot.val() 
+        : { totalPoints: 0, lastUpdated: new Date().toISOString() };
+
+      const updatedPoints: UserPoints = {
+        totalPoints: currentPoints.totalPoints + seconds,
+        lastUpdated: new Date().toISOString()
+      };
+
+
+      await set(userPointsRef, updatedPoints);
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      throw new Error('Failed to award points');
+    }
+  }
+
+
+  static async getUserPoints(userId: string): Promise<UserPoints> {
+    const database = firebaseService.database;
+    if (!database) {
+      console.error('Database not found');
+      throw new Error('Database not found');
+    }
+
+    const userPointsRef = ref(database, `userPoints/${userId}`);
+
+    try {
+      const snapshot = await get(userPointsRef);
+      if (snapshot.exists()) {
+        return snapshot.val();
+      }
+      return { totalPoints: 0, lastUpdated: new Date().toISOString() };
+    } catch (error) {
+      console.error('Error fetching user points:', error);
+      throw new Error('Failed to fetch user points');
     }
   }
 }

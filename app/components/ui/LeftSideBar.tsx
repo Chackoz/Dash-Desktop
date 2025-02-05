@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { User } from "firebase/auth";
-import { GithubRelease, Task } from "@/app/types/types";
+import { GithubRelease, Task, UserPoints } from "@/app/types/types";
 import { TaskListItem } from "./TaskListItem";
 
 interface LeftSidebarProps {
@@ -27,6 +27,7 @@ interface LeftSidebarProps {
   walletAddress: string;
   isConnecting: boolean;
   connectWallet: () => void;
+  userPoints: UserPoints;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -46,6 +47,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   walletAddress,
   isConnecting,
   connectWallet,
+  userPoints
 }) => {
   return (
     <div className="flex w-80 flex-col border-r">
@@ -95,6 +97,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </div>
           <div className="mt-2 text-sm text-muted-foreground">
             {"User ID : " + user.uid}
+          </div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            {"Wallet : " + userPoints.totalPoints + " DASH COINS"}
           </div>
 
           {/* Wallet connection */}

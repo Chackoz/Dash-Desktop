@@ -36,6 +36,7 @@ import {
   SystemMetadata,
   Task,
   NodeStatus,
+  UserPoints,
 } from "../../types/types";
 import { signOut } from "firebase/auth";
 import { firebaseService } from "../../services/firebase";
@@ -93,6 +94,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [memoryLimit, setMemoryLimit] = useState("512m");
   const [cpuLimit, setCpuLimit] = useState("1");
   const [isStoppingContainer, setIsStoppingContainer] = useState(false);
+  const [userPoints, setUserPoints] = useState<UserPoints>({ totalPoints: 0, lastUpdated: '' });
 
   // Version Control State
   const [latestVersion, setLatestVersion] = useState<GithubRelease | null>(
@@ -106,6 +108,17 @@ export default function DashNetwork({ user }: DashNetworkProps) {
   const [isConnecting, setIsConnecting] = useState(false);
 
   const { isDarkMode, toggleTheme } = useTheme();
+
+
+  const fetchUserPoints = async () => {
+    if (!user.uid) return;
+    try {
+      const points = await TaskService.getUserPoints(user.uid);
+      setUserPoints(points);
+    } catch (error) {
+      console.error('Error fetching user points:', error);
+    }
+  };
 
   // Version Check Effect
   useEffect(() => {
@@ -395,57 +408,85 @@ export default function DashNetwork({ user }: DashNetworkProps) {
     });
   };
 
-  const executeTask = async (taskId: string, task: Task) => {
-    setNodeStatus("busy");
-    updateNodeStatus(clientId, "busy");
+  // Modify the executeTask function in DashNetwork
+const executeTask = async (taskId: string, task: Task) => {
+  setNodeStatus("busy");
+  updateNodeStatus(clientId, "busy");
+  const startTime = new Date().toISOString();
 
-    try {
-      if (!database) return;
+  try {
+    if (!database) return;
 
-      await update(ref(database, `tasks/${taskId}`), {
-        status: "running",
-        startedAt: new Date().toISOString(),
+    await update(ref(database, `tasks/${taskId}`), {
+      status: "running",
+      startedAt: startTime,
+    });
+
+    let result;
+    if (task.taskType === "docker" && task.dockerConfig) {
+      result = await invoke<string>("run_docker_hub_image", {
+        image: task.dockerConfig.image,
+        command: task.dockerConfig.command || [],
+        memoryLimit: task.dockerConfig.memoryLimit || "512m",
+        cpuLimit: task.dockerConfig.cpuLimit || "1",
+        id: task.id,
+        timeLimit: task.timeLimit,
       });
-
-      let result;
-      if (task.taskType === "docker" && task.dockerConfig) {
-        result = await invoke<string>("run_docker_hub_image", {
-          image: task.dockerConfig.image,
-          command: task.dockerConfig.command || [],
-          memoryLimit: task.dockerConfig.memoryLimit || "512m",
-          cpuLimit: task.dockerConfig.cpuLimit || "1",
-          id: task.id,
-          timeLimit: task.timeLimit,
-        });
-      } else if (task.code) {
-        result = await invoke<string>("run_python_code", {
-          code: task.code,
-          requirements: task.requirements,
-        });
-      } else {
-        throw new Error("Invalid task configuration");
-      }
-
-      await update(ref(database, `tasks/${taskId}`), {
-        status: "completed",
-        doneUserId: user.uid,
-        output: result,
-        completedAt: new Date().toISOString(),
+    } else if (task.code) {
+      result = await invoke<string>("run_python_code", {
+        code: task.code,
+        requirements: task.requirements,
       });
-    } catch (error) {
-      if (!database) return;
-
-      await update(ref(database, `tasks/${taskId}`), {
-        status: "failed",
-        doneUserId: user.uid,
-        output: `Error: ${(error as Error).toString()}`,
-        completedAt: new Date().toISOString(),
-      });
-    } finally {
-      setNodeStatus("idle");
-      updateNodeStatus(clientId, "idle");
+    } else {
+      throw new Error("Invalid task configuration");
     }
-  };
+
+    const endTime = new Date().toISOString();
+    
+    // Calculate runtime and award points
+    const runtime = Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000);
+    await TaskService.awardPoints(user.uid, runtime);
+
+    await update(ref(database, `tasks/${taskId}`), {
+      status: "completed",
+      doneUserId: user.uid,
+      output: result,
+      completedAt: endTime,
+      runtime: runtime // Store runtime for reference
+    });
+
+    // Refresh user points after task completion
+    await fetchUserPoints();
+
+  } catch (error) {
+    if (!database) return;
+
+    await update(ref(database, `tasks/${taskId}`), {
+      status: "failed",
+      doneUserId: user.uid,
+      output: `Error: ${(error as Error).toString()}`,
+      completedAt: new Date().toISOString(),
+    });
+  } finally {
+    setNodeStatus("idle");
+    updateNodeStatus(clientId, "idle");
+  }
+};
+useEffect(() => {
+  if (!database || !user.uid) return;
+
+  fetchUserPoints();
+
+  const userPointsRef = ref(database, `userPoints/${user.uid}`);
+  const unsubscribe = onValue(userPointsRef, (snapshot) => {
+    const points = snapshot.val();
+    if (points) {
+      setUserPoints(points);
+    }
+  });
+
+  return () => unsubscribe();
+}, [user.uid]);
 
   // Memoized Values
   const filteredTasks = useMemo(
@@ -572,6 +613,7 @@ export default function DashNetwork({ user }: DashNetworkProps) {
         walletAddress={walletAddress}
         isConnecting={isConnecting}
         connectWallet={connectWallet}
+        userPoints={userPoints}
       />
 
       {/* Main Content Area */}
