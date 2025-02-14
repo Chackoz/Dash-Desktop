@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
   Download,
-  Loader2,
   Moon,
   RefreshCcw,
   Sun,
@@ -25,6 +24,7 @@ import {
   SystemError,
   SystemSpecs,
 } from "../../types/types";
+import CubeLoader from "../ui/CubeLoader";
 
 const database = firebaseService.database;
 const auth = firebaseService.auth;
@@ -304,11 +304,11 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
         <div className="relative z-10 rounded-full bg-background/80 p-4 backdrop-blur-sm">
           {isRetrying ? (
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <CubeLoader/>
           ) : systemErrors.some((e) => e.severity === "critical") ? (
-            <XCircle className="h-12 w-12 text-destructive" />
+            <XCircle className="h-14 w-14 text-destructive" />
           ) : (
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <CubeLoader/>
           )}
         </div>
       </div>
