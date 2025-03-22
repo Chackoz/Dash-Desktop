@@ -91,7 +91,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           )}
 
           {/* User info */}
-          <div className="mt-2 text-sm text-muted-foreground">{user.email}</div>
+          <div className="mt-2 text-sm text-muted-foreground">{"Email : " +user.email}</div>
           <div className="mt-2 text-sm text-muted-foreground">
             {"Client ID : " + clientId?.replaceAll("-", "")}
           </div>
