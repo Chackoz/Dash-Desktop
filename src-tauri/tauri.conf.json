@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DASH",
-  "version": "1.9.7",
+  "version": "1.9.8",
   "identifier": "com.dashdesktop.app",
   "build": {
     "frontendDist": "../out",
