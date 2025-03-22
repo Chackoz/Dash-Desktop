@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DASH",
-  "version": "1.9.4",
-  "identifier": "dashdesktop",
+  "version": "1.9.5",
+  "identifier": "com.dashdesktop.app",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
@@ -37,10 +37,24 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null,
+      "providerShortName": null,
+      "license": null
+    },
     "linux": {
       "deb": {
         "depends": []
       }
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
     }
   },
   "plugins": {

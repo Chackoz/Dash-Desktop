@@ -22,10 +22,8 @@ import {
   Loader,
   AlertCircle,
 } from "lucide-react";
-
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-
 import { useTheme } from "./ThemeProvider";
 import { currentDASHVersion } from "../../data/data";
 import {
@@ -42,7 +40,6 @@ import { signOut } from "firebase/auth";
 import { firebaseService } from "../../services/firebase";
 import { TaskService } from "../../services/task";
 import { NodeService } from "../../services/node";
-
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import NetworkPanel from "./NetworkPanel";

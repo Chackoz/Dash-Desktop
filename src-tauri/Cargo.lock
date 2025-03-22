@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "DASH"
-version = "1.9.4"
+version = "1.9.5"
 dependencies = [
  "env_logger",
  "log",
