@@ -43,8 +43,7 @@
       "exceptionDomain": "",
       "signingIdentity": null,
       "entitlements": null,
-      "providerShortName": null,
-      "license": null
+      "providerShortName": null
     },
     "linux": {
       "deb": {
