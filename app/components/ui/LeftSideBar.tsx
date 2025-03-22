@@ -99,7 +99,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             {"User ID : " + user.uid}
           </div>
           <div className="mt-2 text-sm text-muted-foreground">
-            {"Wallet : " + userPoints.totalPoints + " DASH COINS"}
+            {"Wallet : " + userPoints.totalPoints + " DASH Coins"}
           </div>
 
           {/* Wallet connection */}

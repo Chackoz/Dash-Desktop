@@ -315,7 +315,7 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({
 
       <div className="mt-8 max-w-md space-y-6 px-4 text-center">
         <div className="space-y-2">
-          <h2 className="animate-pulse text-2xl font-bold text-primary">
+          <h2 className="animate-pulse text-3xl font-bold text-primary">
             DASH
           </h2>
           <p className="animate-fade-in-up text-sm text-muted-foreground">
