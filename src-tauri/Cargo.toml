@@ -1,6 +1,6 @@
 [package]
 name = "DASH"
-version = "1.9.9"
+version = "2.0.0"
 description = "Distributed Adaptive Serverless Hosting"
 authors = ["Adithya Krishnan", "Ferwin Lopez", "Nevia Sebastian", "Nikita Nair"]
 license = "MIT License"
