@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { User } from "firebase/auth";
 import { GithubRelease, Task, UserPoints } from "@/app/types/types";
 import { TaskListItem } from "./TaskListItem";
+import { DashCoinTransfer } from "./DashCoinTransfer";
 
 interface LeftSidebarProps {
   user: User;
@@ -100,6 +101,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </div>
           <div className="mt-2 text-sm text-muted-foreground">
             {"Wallet : " + userPoints.totalPoints + " DASH Coins"}
+          </div>
+
+          {/* Dash Coin Transfer Button */}
+          <div className="mt-4">
+            <DashCoinTransfer 
+              userPoints={userPoints} 
+              userId={user.uid} 
+            />
           </div>
 
           {/* Wallet connection */}
